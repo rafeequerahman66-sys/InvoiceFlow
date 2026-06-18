@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Design tokens (InvoiceFlow "Studio Nine" handoff) ───────────────────────
+   Dark is the default (:root). `.light` swaps to a light variant. Components
+   reference these via Tailwind arbitrary values, e.g. bg-[var(--card)]. */
+:root {
+  color-scheme: dark;
+  --app-bg: #0b0c0e;
+  --sidebar-bg: #0e0f12;
+  --shell-border: #1c1f24;
+  --card: #141619;
+  --card-inset: #0e1013;
+  --raised: #1a1d22;
+  --border: #22252b;
+  --border-2: #23262c;
+  --divider: #1e2127;
+  --row-divider: #181b1f;
+  --row-hover: #17191d;
+  --nav-hover: rgba(255, 255, 255, 0.04);
+  --text: #ecedef;
+  --text-mid: #a7abb2;
+  --text-soft: #8a909a;
+  --text-dim: #6b707a;
+  --text-faint: #5b616b;
+  --accent: #f6d94e;
+  --accent-hover: #f8e177;
+  --accent-ink: #16140a;
+  --positive: #74d9a0;
+  --negative: #f2868a;
+  --info: #9cc0ff;
+  --purple: #bba8ff;
+}
+
+.light {
+  color-scheme: light;
+  --app-bg: #f7f7f8;
+  --sidebar-bg: #ffffff;
+  --shell-border: #e6e8eb;
+  --card: #ffffff;
+  --card-inset: #f3f4f6;
+  --raised: #f1f2f4;
+  --border: #e5e7eb;
+  --border-2: #e5e7eb;
+  --divider: #eceef1;
+  --row-divider: #f1f2f4;
+  --row-hover: #f5f6f8;
+  --nav-hover: rgba(0, 0, 0, 0.04);
+  --text: #18181b;
+  --text-mid: #52555b;
+  --text-soft: #6b7280;
+  --text-dim: #8a909a;
+  --text-faint: #9aa0a8;
+  --accent: #e8c321;
+  --accent-hover: #f2d544;
+  --accent-ink: #1a1606;
+  --positive: #16a34a;
+  --negative: #dc2626;
+  --info: #2563eb;
+  --purple: #7c3aed;
+}
+
+body {
+  background: var(--app-bg);
+  color: var(--text);
+  font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "ss01";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Print: white A4 paper, hide app chrome. */
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-sheet {
+    box-shadow: none !important;
+    border: none !important;
+  }
+}

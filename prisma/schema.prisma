@@ -1,0 +1,260 @@
+// Prisma schema for InvoiceFlow — Rin Media internal billing tool.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  MEMBER
+}
+
+enum ItemKind {
+  SERVICE
+  PRODUCT
+}
+
+enum DiscountType {
+  PERCENT
+  FLAT
+}
+
+enum SupplyType {
+  INTRA_STATE
+  INTER_STATE
+  EXPORT_LUT
+  EXPORT_WITH_TAX
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CONVERTED
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  UPI
+  RAZORPAY
+  CRYPTO
+  OTHER
+}
+
+enum DocType {
+  INVOICE
+  QUOTE
+}
+
+/// Singleton: Rin Media's own details. Seed exactly one row (id = "rinmedia").
+model BusinessProfile {
+  id             String   @id @default("rinmedia")
+  legalName      String   @default("Crew Catalyst Innovations Private Limited")
+  brandName      String   @default("Rin Media")
+  gstin          String   @default("32AANCC1730B1ZB")
+  stateCode      String   @default("32") // Kerala
+  address        String
+  email          String
+  phone          String?
+  lutNumber      String? // for export-under-LUT declaration
+  defaultSacCode String?  @default("998361")
+  bankName       String?
+  bankAccount    String?
+  ifsc           String?
+  swift          String? // for inbound USD/EUR wires
+  logoUrl        String?
+  invoicePrefix  String   @default("INV")
+  quotePrefix    String   @default("QT")
+  updatedAt      DateTime @updatedAt
+}
+
+model User {
+  id        String        @id @default(cuid())
+  email     String        @unique
+  name      String?
+  role      Role          @default(MEMBER)
+  invoices  Invoice[]
+  quotes    Quotation[]
+  logs      ActivityLog[]
+  createdAt DateTime      @default(now())
+}
+
+model Client {
+  id              String      @id @default(cuid())
+  name            String // contact person
+  company         String?
+  email           String?
+  phone           String?
+  billingAddress  String?
+  country         String      @default("IN") // ISO-2
+  stateCode       String? // Indian state code when country == IN
+  gstin           String? // present => B2B
+  defaultCurrency String      @default("INR")
+  notes           String?
+  invoices        Invoice[]
+  quotes          Quotation[]
+  archived        Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+
+  @@index([company])
+}
+
+model CatalogItem {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  kind        ItemKind @default(SERVICE)
+  sacCode     String?
+  defaultRate Decimal  @db.Decimal(12, 2)
+  defaultTax  Decimal  @default(18) @db.Decimal(5, 2)
+  archived    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+/// Gapless sequential numbering, one counter per financial year per doc type.
+model NumberSequence {
+  id         String  @id @default(cuid())
+  docType    DocType
+  fyLabel    String // e.g. "2026-27"
+  lastNumber Int     @default(0)
+
+  @@unique([docType, fyLabel])
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  number         String        @unique // INV/2026-27/0001
+  fyLabel        String
+  client         Client        @relation(fields: [clientId], references: [id])
+  clientId       String
+  status         InvoiceStatus @default(DRAFT)
+  issueDate      DateTime
+  dueDate        DateTime
+  currency       String        @default("INR")
+  fxRateToInr    Decimal       @default(1) @db.Decimal(12, 4)
+  supplyType     SupplyType
+  placeOfSupply  String?
+  subtotal       Decimal       @db.Decimal(14, 2)
+  discountType   DiscountType  @default(PERCENT)
+  discountValue  Decimal       @default(0) @db.Decimal(14, 2)
+  taxableValue   Decimal       @db.Decimal(14, 2)
+  cgst           Decimal       @default(0) @db.Decimal(14, 2)
+  sgst           Decimal       @default(0) @db.Decimal(14, 2)
+  igst           Decimal       @default(0) @db.Decimal(14, 2)
+  total          Decimal       @db.Decimal(14, 2)
+  totalInr       Decimal       @db.Decimal(14, 2)
+  notes          String?
+  terms          String?
+  lutDeclaration Boolean       @default(false)
+  pdfUrl         String?
+  items          InvoiceItem[]
+  payments       Payment[]
+  createdBy      User          @relation(fields: [createdById], references: [id])
+  createdById    String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([clientId, status])
+  @@index([issueDate])
+}
+
+model InvoiceItem {
+  id           String   @id @default(cuid())
+  invoice      Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId    String
+  name         String
+  description  String?
+  sacCode      String?
+  qty          Decimal  @default(1) @db.Decimal(10, 2)
+  unit         String?  @default("nos")
+  rate         Decimal  @db.Decimal(12, 2)
+  taxRate      Decimal  @default(18) @db.Decimal(5, 2)
+  lineSubtotal Decimal  @db.Decimal(14, 2)
+  lineTax      Decimal  @db.Decimal(14, 2)
+  lineTotal    Decimal  @db.Decimal(14, 2)
+}
+
+model Quotation {
+  id                 String       @id @default(cuid())
+  number             String       @unique
+  fyLabel            String
+  client             Client       @relation(fields: [clientId], references: [id])
+  clientId           String
+  status             QuoteStatus  @default(DRAFT)
+  issueDate          DateTime
+  validTill          DateTime
+  currency           String       @default("INR")
+  supplyType         SupplyType
+  subtotal           Decimal      @db.Decimal(14, 2)
+  discountType       DiscountType @default(PERCENT)
+  discountValue      Decimal      @default(0) @db.Decimal(14, 2)
+  taxableValue       Decimal      @db.Decimal(14, 2)
+  totalTax           Decimal      @db.Decimal(14, 2)
+  total              Decimal      @db.Decimal(14, 2)
+  notes              String?
+  terms              String?
+  convertedInvoiceId String?
+  items              QuoteItem[]
+  createdBy          User         @relation(fields: [createdById], references: [id])
+  createdById        String
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@index([clientId, status])
+}
+
+model QuoteItem {
+  id          String    @id @default(cuid())
+  quote       Quotation @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  quoteId     String
+  name        String
+  description String?
+  sacCode     String?
+  qty         Decimal   @default(1) @db.Decimal(10, 2)
+  rate        Decimal   @db.Decimal(12, 2)
+  taxRate     Decimal   @default(18) @db.Decimal(5, 2)
+  lineTotal   Decimal   @db.Decimal(14, 2)
+}
+
+model Payment {
+  id        String        @id @default(cuid())
+  invoice   Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId String
+  amount    Decimal       @db.Decimal(14, 2)
+  currency  String        @default("INR")
+  method    PaymentMethod @default(BANK_TRANSFER)
+  reference String? // UTR, txn hash, Razorpay id
+  paidAt    DateTime
+  notes     String?
+  createdAt DateTime      @default(now())
+
+  @@index([invoiceId])
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  actor      User?    @relation(fields: [actorId], references: [id])
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  meta       Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+}

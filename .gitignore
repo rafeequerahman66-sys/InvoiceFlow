@@ -1,0 +1,15 @@
+node_modules
+.next
+.env
+.env*.local
+*.log
+
+# Local SQLite (dev only) — never commit
+*.db
+*.db-journal
+prisma/dev.db*
+
+# OS / editor
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts
