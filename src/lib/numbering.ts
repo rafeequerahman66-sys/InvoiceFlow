@@ -1,4 +1,5 @@
-import type { Prisma, DocType } from "@prisma/client";
+import type { DocType } from "@prisma/client";
+import type { TxClient } from "@/lib/db";
 
 /**
  * Indian financial year runs April–March. An invoice issued in June 2026 falls
@@ -17,7 +18,7 @@ export function fyLabelFor(date: Date): string {
  * Returns e.g. "INV/2026-27/0007".
  */
 export async function nextNumber(
-  tx: Prisma.TransactionClient,
+  tx: TxClient,
   docType: DocType,
   prefix: string,
   issueDate: Date
