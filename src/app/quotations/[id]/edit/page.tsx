@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { prisma } from "@/lib/db";
 import { QuoteForm } from "../../new/quote-form";
+import type { SupplyType } from "@/lib/tax";
 
 export default async function EditQuotePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -32,9 +33,9 @@ export default async function EditQuotePage({ params }: { params: Promise<{ id: 
           currency: quote.currency,
           issueDate: quote.issueDate.toISOString().slice(0, 10),
           validTill: quote.validTill.toISOString().slice(0, 10),
-          discountType: quote.discountType,
+          discountType: quote.discountType as "PERCENT" | "FLAT",
           discountValue: Number(quote.discountValue),
-          supplyType: quote.supplyType,
+          supplyType: quote.supplyType as SupplyType,
           notes: quote.notes ?? "",
           items: quote.items.map((it) => ({
             name: it.name,

@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { prisma } from "@/lib/db";
 import { InvoiceForm } from "../../new/invoice-form";
+import type { SupplyType } from "@/lib/tax";
 
 export default async function EditInvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -32,9 +33,9 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
           currency: invoice.currency,
           issueDate: invoice.issueDate.toISOString().slice(0, 10),
           dueDate: invoice.dueDate.toISOString().slice(0, 10),
-          discountType: invoice.discountType,
+          discountType: invoice.discountType as "PERCENT" | "FLAT",
           discountValue: Number(invoice.discountValue),
-          supplyType: invoice.supplyType,
+          supplyType: invoice.supplyType as SupplyType,
           notes: invoice.notes ?? "",
           terms: invoice.terms ?? "",
           items: invoice.items.map((it) => ({

@@ -18,7 +18,7 @@ export default async function EditCatalogItemPage({ params }: { params: Promise<
         initial={{
           name: item.name,
           description: item.description ?? undefined,
-          kind: item.kind,
+          kind: item.kind as "SERVICE" | "PRODUCT",
           sacCode: item.sacCode ?? undefined,
           defaultRate: Number(item.defaultRate),
           defaultTax: Number(item.defaultTax),

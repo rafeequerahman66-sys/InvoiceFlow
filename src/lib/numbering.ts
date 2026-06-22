@@ -1,5 +1,6 @@
-import type { DocType } from "@prisma/client";
 import type { TxClient } from "@/lib/db";
+
+export type DocType = "INVOICE" | "QUOTE";
 
 /**
  * Indian financial year runs April–March. An invoice issued in June 2026 falls

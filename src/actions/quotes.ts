@@ -15,7 +15,7 @@ import {
 } from "@/lib/tax";
 import { getMailer } from "@/lib/integrations/email";
 import { createQuoteSchema, type CreateQuoteInput } from "@/lib/validators";
-import type { QuoteStatus } from "@prisma/client";
+type QuoteStatus = "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED" | "EXPIRED" | "CONVERTED";
 
 const QUOTE_PREFIX = "QT";
 
@@ -213,8 +213,8 @@ export async function convertQuoteToInvoice(quoteId: string) {
     rate: Number(it.rate),
     taxRate: Number(it.taxRate),
   }));
-  const totals = computeInvoiceTotals(quote.supplyType, items, {
-    type: quote.discountType,
+  const totals = computeInvoiceTotals(quote.supplyType as SupplyType, items, {
+    type: quote.discountType as "PERCENT" | "FLAT",
     value: Number(quote.discountValue),
   });
   const fxRate = await getFxRateToInr(quote.currency, new Date());
@@ -249,7 +249,7 @@ export async function convertQuoteToInvoice(quoteId: string) {
         totalInr,
         notes: quote.notes,
         terms: quote.terms,
-        lutDeclaration: needsLutDeclaration(quote.supplyType),
+        lutDeclaration: needsLutDeclaration(quote.supplyType as SupplyType),
         createdById: userId,
         items: {
           create: quote.items.map((it, idx) => ({
@@ -279,7 +279,7 @@ export async function convertQuoteToInvoice(quoteId: string) {
       action: "quote.converted",
       entityType: "Quotation",
       entityId: quoteId,
-      meta: { invoiceId: invoice.id, invoiceNumber: invoice.number },
+      meta: JSON.stringify({ invoiceId: invoice.id, invoiceNumber: invoice.number }),
     },
   });
 

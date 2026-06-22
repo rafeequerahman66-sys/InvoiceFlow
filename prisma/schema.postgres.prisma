@@ -1,27 +1,65 @@
 // Prisma schema for InvoiceFlow — Rin Media internal billing tool.
-//
-// LOCAL DEV uses SQLite (file-based, fast, offline) because this machine's
-// network path to Supabase is slow/flaky. The canonical PRODUCTION schema
-// (PostgreSQL, with real enums + @db types + Json) is kept in
-// prisma/schema.postgres.prisma. To use Supabase: copy that over this file,
-// set DATABASE_URL to the Supabase URL, and run `prisma migrate deploy`.
-// SQLite has no native enums / @db types / Json, so enum fields are String
-// (allowed values noted below) and ActivityLog.meta is JSON-encoded text.
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// String-enum values:
-// Role: OWNER|MEMBER · ItemKind: SERVICE|PRODUCT · DiscountType: PERCENT|FLAT
-// SupplyType: INTRA_STATE|INTER_STATE|EXPORT_LUT|EXPORT_WITH_TAX
-// InvoiceStatus: DRAFT|SENT|PARTIALLY_PAID|PAID|OVERDUE|CANCELLED
-// QuoteStatus: DRAFT|SENT|ACCEPTED|REJECTED|EXPIRED|CONVERTED
-// PaymentMethod: BANK_TRANSFER|UPI|RAZORPAY|CRYPTO|OTHER · DocType: INVOICE|QUOTE
+enum Role {
+  OWNER
+  MEMBER
+}
+
+enum ItemKind {
+  SERVICE
+  PRODUCT
+}
+
+enum DiscountType {
+  PERCENT
+  FLAT
+}
+
+enum SupplyType {
+  INTRA_STATE
+  INTER_STATE
+  EXPORT_LUT
+  EXPORT_WITH_TAX
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CONVERTED
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  UPI
+  RAZORPAY
+  CRYPTO
+  OTHER
+}
+
+enum DocType {
+  INVOICE
+  QUOTE
+}
 
 /// Singleton: Rin Media's own details. Seed exactly one row (id = "rinmedia").
 model BusinessProfile {
@@ -29,16 +67,16 @@ model BusinessProfile {
   legalName      String   @default("Crew Catalyst Innovations Private Limited")
   brandName      String   @default("Rin Media")
   gstin          String   @default("32AANCC1730B1ZB")
-  stateCode      String   @default("32")
+  stateCode      String   @default("32") // Kerala
   address        String
   email          String
   phone          String?
-  lutNumber      String?
+  lutNumber      String? // for export-under-LUT declaration
   defaultSacCode String?  @default("998361")
   bankName       String?
   bankAccount    String?
   ifsc           String?
-  swift          String?
+  swift          String? // for inbound USD/EUR wires
   logoUrl        String?
   invoicePrefix  String   @default("INV")
   quotePrefix    String   @default("QT")
@@ -49,7 +87,7 @@ model User {
   id        String        @id @default(cuid())
   email     String        @unique
   name      String?
-  role      String        @default("MEMBER")
+  role      Role          @default(MEMBER)
   invoices  Invoice[]
   quotes    Quotation[]
   logs      ActivityLog[]
@@ -58,14 +96,14 @@ model User {
 
 model Client {
   id              String      @id @default(cuid())
-  name            String
+  name            String // contact person
   company         String?
   email           String?
   phone           String?
   billingAddress  String?
-  country         String      @default("IN")
-  stateCode       String?
-  gstin           String?
+  country         String      @default("IN") // ISO-2
+  stateCode       String? // Indian state code when country == IN
+  gstin           String? // present => B2B
   defaultCurrency String      @default("INR")
   notes           String?
   invoices        Invoice[]
@@ -80,46 +118,46 @@ model CatalogItem {
   id          String   @id @default(cuid())
   name        String
   description String?
-  kind        String   @default("SERVICE")
+  kind        ItemKind @default(SERVICE)
   sacCode     String?
-  defaultRate Decimal
-  defaultTax  Decimal  @default(18)
+  defaultRate Decimal  @db.Decimal(12, 2)
+  defaultTax  Decimal  @default(18) @db.Decimal(5, 2)
   archived    Boolean  @default(false)
   createdAt   DateTime @default(now())
 }
 
 /// Gapless sequential numbering, one counter per financial year per doc type.
 model NumberSequence {
-  id         String @id @default(cuid())
-  docType    String
-  fyLabel    String
-  lastNumber Int    @default(0)
+  id         String  @id @default(cuid())
+  docType    DocType
+  fyLabel    String // e.g. "2026-27"
+  lastNumber Int     @default(0)
 
   @@unique([docType, fyLabel])
 }
 
 model Invoice {
   id             String        @id @default(cuid())
-  number         String        @unique
+  number         String        @unique // INV/2026-27/0001
   fyLabel        String
   client         Client        @relation(fields: [clientId], references: [id])
   clientId       String
-  status         String        @default("DRAFT")
+  status         InvoiceStatus @default(DRAFT)
   issueDate      DateTime
   dueDate        DateTime
   currency       String        @default("INR")
-  fxRateToInr    Decimal       @default(1)
-  supplyType     String
+  fxRateToInr    Decimal       @default(1) @db.Decimal(12, 4)
+  supplyType     SupplyType
   placeOfSupply  String?
-  subtotal       Decimal
-  discountType   String        @default("PERCENT")
-  discountValue  Decimal       @default(0)
-  taxableValue   Decimal
-  cgst           Decimal       @default(0)
-  sgst           Decimal       @default(0)
-  igst           Decimal       @default(0)
-  total          Decimal
-  totalInr       Decimal
+  subtotal       Decimal       @db.Decimal(14, 2)
+  discountType   DiscountType  @default(PERCENT)
+  discountValue  Decimal       @default(0) @db.Decimal(14, 2)
+  taxableValue   Decimal       @db.Decimal(14, 2)
+  cgst           Decimal       @default(0) @db.Decimal(14, 2)
+  sgst           Decimal       @default(0) @db.Decimal(14, 2)
+  igst           Decimal       @default(0) @db.Decimal(14, 2)
+  total          Decimal       @db.Decimal(14, 2)
+  totalInr       Decimal       @db.Decimal(14, 2)
   notes          String?
   terms          String?
   lutDeclaration Boolean       @default(false)
@@ -142,40 +180,40 @@ model InvoiceItem {
   name         String
   description  String?
   sacCode      String?
-  qty          Decimal  @default(1)
+  qty          Decimal  @default(1) @db.Decimal(10, 2)
   unit         String?  @default("nos")
-  rate         Decimal
-  taxRate      Decimal  @default(18)
-  lineSubtotal Decimal
-  lineTax      Decimal
-  lineTotal    Decimal
+  rate         Decimal  @db.Decimal(12, 2)
+  taxRate      Decimal  @default(18) @db.Decimal(5, 2)
+  lineSubtotal Decimal  @db.Decimal(14, 2)
+  lineTax      Decimal  @db.Decimal(14, 2)
+  lineTotal    Decimal  @db.Decimal(14, 2)
 }
 
 model Quotation {
-  id                 String      @id @default(cuid())
-  number             String      @unique
+  id                 String       @id @default(cuid())
+  number             String       @unique
   fyLabel            String
-  client             Client      @relation(fields: [clientId], references: [id])
+  client             Client       @relation(fields: [clientId], references: [id])
   clientId           String
-  status             String      @default("DRAFT")
+  status             QuoteStatus  @default(DRAFT)
   issueDate          DateTime
   validTill          DateTime
-  currency           String      @default("INR")
-  supplyType         String
-  subtotal           Decimal
-  discountType       String      @default("PERCENT")
-  discountValue      Decimal     @default(0)
-  taxableValue       Decimal
-  totalTax           Decimal
-  total              Decimal
+  currency           String       @default("INR")
+  supplyType         SupplyType
+  subtotal           Decimal      @db.Decimal(14, 2)
+  discountType       DiscountType @default(PERCENT)
+  discountValue      Decimal      @default(0) @db.Decimal(14, 2)
+  taxableValue       Decimal      @db.Decimal(14, 2)
+  totalTax           Decimal      @db.Decimal(14, 2)
+  total              Decimal      @db.Decimal(14, 2)
   notes              String?
   terms              String?
   convertedInvoiceId String?
   items              QuoteItem[]
-  createdBy          User        @relation(fields: [createdById], references: [id])
+  createdBy          User         @relation(fields: [createdById], references: [id])
   createdById        String
-  createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
   @@index([clientId, status])
 }
@@ -187,23 +225,23 @@ model QuoteItem {
   name        String
   description String?
   sacCode     String?
-  qty         Decimal   @default(1)
-  rate        Decimal
-  taxRate     Decimal   @default(18)
-  lineTotal   Decimal
+  qty         Decimal   @default(1) @db.Decimal(10, 2)
+  rate        Decimal   @db.Decimal(12, 2)
+  taxRate     Decimal   @default(18) @db.Decimal(5, 2)
+  lineTotal   Decimal   @db.Decimal(14, 2)
 }
 
 model Payment {
-  id        String   @id @default(cuid())
-  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  id        String        @id @default(cuid())
+  invoice   Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   invoiceId String
-  amount    Decimal
-  currency  String   @default("INR")
-  method    String   @default("BANK_TRANSFER")
-  reference String?
+  amount    Decimal       @db.Decimal(14, 2)
+  currency  String        @default("INR")
+  method    PaymentMethod @default(BANK_TRANSFER)
+  reference String? // UTR, txn hash, Razorpay id
   paidAt    DateTime
   notes     String?
-  createdAt DateTime @default(now())
+  createdAt DateTime      @default(now())
 
   @@index([invoiceId])
 }
@@ -215,7 +253,7 @@ model ActivityLog {
   action     String
   entityType String
   entityId   String
-  meta       String?
+  meta       Json?
   createdAt  DateTime @default(now())
 
   @@index([entityType, entityId])

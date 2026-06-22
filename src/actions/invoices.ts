@@ -21,7 +21,7 @@ import {
   type CreateInvoiceInput,
   type PaymentInput,
 } from "@/lib/validators";
-import type { InvoiceStatus } from "@prisma/client";
+type InvoiceStatus = "DRAFT" | "SENT" | "PARTIALLY_PAID" | "PAID" | "OVERDUE" | "CANCELLED";
 
 /** Resolve supply type + computed totals + fx for a payload. */
 async function buildInvoice(data: CreateInvoiceInput) {
@@ -98,7 +98,7 @@ export async function createInvoice(input: CreateInvoiceInput) {
       action: "invoice.created",
       entityType: "Invoice",
       entityId: invoice.id,
-      meta: { number: invoice.number },
+      meta: JSON.stringify({ number: invoice.number }),
     },
   });
 
@@ -255,7 +255,7 @@ export async function recordPayment(input: PaymentInput) {
 
   const paid = inv.payments.reduce((s, p) => s + Number(p.amount), 0) + data.amount;
   const total = Number(inv.total);
-  const status: InvoiceStatus = paid >= total ? "PAID" : paid > 0 ? "PARTIALLY_PAID" : inv.status;
+  const status: InvoiceStatus = paid >= total ? "PAID" : paid > 0 ? "PARTIALLY_PAID" : (inv.status as InvoiceStatus);
 
   await prisma.invoice.update({ where: { id: inv.id }, data: { status } });
   await prisma.activityLog.create({
@@ -264,7 +264,7 @@ export async function recordPayment(input: PaymentInput) {
       action: "invoice.payment",
       entityType: "Invoice",
       entityId: inv.id,
-      meta: { amount: data.amount, method: data.method },
+      meta: JSON.stringify({ amount: data.amount, method: data.method }),
     },
   });
 
