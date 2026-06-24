@@ -1,6 +1,8 @@
-// Prisma schema for InvoiceFlow — Rin Media internal billing tool.
+// Prisma schema for InvoiceFlow — Rin Media internal billing tool (PRODUCTION).
+// Used on Vercel/Supabase. `rhel-openssl-3.0.x` is the Vercel (AWS Lambda) target.
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {

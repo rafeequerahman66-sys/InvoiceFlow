@@ -10,6 +10,8 @@
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "postinstall": "node scripts/prisma-generate.mjs",
+    "vercel-build": "node scripts/prisma-generate.mjs && prisma db push --schema=prisma/schema.postgres.prisma --skip-generate && next build",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio"
