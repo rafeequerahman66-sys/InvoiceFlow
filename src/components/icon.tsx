@@ -13,6 +13,7 @@ type IconName =
   | "bolt"
   | "download"
   | "send"
+  | "repeat"
   | "doc";
 
 const PATHS: Record<IconName, React.ReactNode> = {
@@ -98,6 +99,14 @@ const PATHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   send: <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />,
+  repeat: (
+    <>
+      <path d="M17 1l4 4-4 4" />
+      <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+      <path d="M7 23l-4-4 4-4" />
+      <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+    </>
+  ),
   doc: (
     <>
       <path d="M5 4h11l3 3v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4z" />

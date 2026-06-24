@@ -52,6 +52,7 @@ model User {
   role      String        @default("MEMBER")
   invoices  Invoice[]
   quotes    Quotation[]
+  recurring RecurringInvoice[]
   logs      ActivityLog[]
   createdAt DateTime      @default(now())
 }
@@ -70,6 +71,7 @@ model Client {
   notes           String?
   invoices        Invoice[]
   quotes          Quotation[]
+  recurring       RecurringInvoice[]
   archived        Boolean     @default(false)
   createdAt       DateTime    @default(now())
 
@@ -219,4 +221,41 @@ model ActivityLog {
   createdAt  DateTime @default(now())
 
   @@index([entityType, entityId])
+}
+
+/// Template that auto-generates invoices on a cadence (retainers).
+model RecurringInvoice {
+  id            String          @id @default(cuid())
+  title         String?
+  client        Client          @relation(fields: [clientId], references: [id])
+  clientId      String
+  cadence       String          @default("MONTHLY") // WEEKLY|MONTHLY|QUARTERLY|YEARLY
+  nextRunDate   DateTime
+  active        Boolean         @default(true)
+  currency      String          @default("INR")
+  supplyType    String
+  discountType  String          @default("PERCENT")
+  discountValue Decimal         @default(0)
+  notes         String?
+  terms         String?
+  items         RecurringItem[]
+  createdBy     User            @relation(fields: [createdById], references: [id])
+  createdById   String
+  lastRunAt     DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([active, nextRunDate])
+}
+
+model RecurringItem {
+  id          String           @id @default(cuid())
+  recurring   RecurringInvoice @relation(fields: [recurringId], references: [id], onDelete: Cascade)
+  recurringId String
+  name        String
+  description String?
+  sacCode     String?
+  qty         Decimal          @default(1)
+  rate        Decimal
+  taxRate     Decimal          @default(18)
 }

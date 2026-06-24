@@ -45,6 +45,22 @@ export const createQuoteSchema = z.object({
 
 export type CreateQuoteInput = z.infer<typeof createQuoteSchema>;
 
+export const createRecurringSchema = z.object({
+  title: z.string().optional(),
+  clientId: z.string().min(1, "Pick a client"),
+  cadence: z.enum(["WEEKLY", "MONTHLY", "QUARTERLY", "YEARLY"]).default("MONTHLY"),
+  nextRunDate: z.coerce.date(),
+  currency: z.string().default("INR"),
+  supplyType: z.enum(["INTRA_STATE", "INTER_STATE", "EXPORT_LUT", "EXPORT_WITH_TAX"]).optional(),
+  discountType: z.enum(["PERCENT", "FLAT"]).default("PERCENT"),
+  discountValue: z.coerce.number().min(0).default(0),
+  notes: z.string().optional(),
+  terms: z.string().optional(),
+  items: z.array(lineItemSchema).min(1, "Add at least one line"),
+});
+
+export type CreateRecurringInput = z.infer<typeof createRecurringSchema>;
+
 export const catalogItemSchema = z.object({
   name: z.string().min(1, "Name required"),
   description: z.string().optional(),
