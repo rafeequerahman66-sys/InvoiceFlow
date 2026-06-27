@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 // Public paths (no session required).
-const PUBLIC = ["/login", "/signup", "/api/auth", "/share", "/api/cron"];
+const PUBLIC = ["/login", "/signup", "/verify", "/api/auth", "/share", "/api/cron"];
 
 /**
  * Edge-safe gate: redirects to /login when the Auth.js session cookie is absent.

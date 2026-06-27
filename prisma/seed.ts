@@ -29,8 +29,8 @@ async function main() {
   const passwordHash = await bcrypt.hash(ownerPassword, 10);
   const owner = await prisma.user.upsert({
     where: { email: ownerEmail },
-    update: {},
-    create: { email: ownerEmail, name: "Rin Media Owner", passwordHash },
+    update: { emailVerified: new Date() },
+    create: { email: ownerEmail, name: "Rin Media Owner", passwordHash, emailVerified: new Date() },
   });
   await prisma.membership.upsert({
     where: { userId_orgId: { userId: owner.id, orgId: org.id } },

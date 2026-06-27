@@ -21,6 +21,9 @@ const providers = [
       if (!user?.passwordHash) return null;
       const ok = await verifyPassword(password, user.passwordHash);
       if (!ok) return null;
+      // Block sign-in until the email is verified (defense-in-depth; the login
+      // action also pre-checks to show a friendlier "verify your email" message).
+      if (!user.emailVerified) return null;
       return { id: user.id, email: user.email, name: user.name };
     },
   }),

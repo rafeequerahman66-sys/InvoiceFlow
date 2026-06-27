@@ -54,16 +54,30 @@ model Organization {
 }
 
 model User {
-  id           String        @id @default(cuid())
-  email        String        @unique
-  name         String?
-  passwordHash String?
-  memberships  Membership[]
-  invoices     Invoice[]
-  quotes       Quotation[]
-  recurring    RecurringInvoice[]
-  logs         ActivityLog[]
-  createdAt    DateTime      @default(now())
+  id            String        @id @default(cuid())
+  email         String        @unique
+  name          String?
+  passwordHash  String?
+  emailVerified DateTime?
+  memberships   Membership[]
+  invoices      Invoice[]
+  quotes        Quotation[]
+  recurring     RecurringInvoice[]
+  logs          ActivityLog[]
+  tokens        VerificationToken[]
+  createdAt     DateTime      @default(now())
+}
+
+/// Single-use email-verification token (signup). Expires; deleted on use.
+model VerificationToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  expires   DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 /// Links a user to an org with a role.

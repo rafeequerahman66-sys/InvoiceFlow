@@ -1,8 +1,20 @@
 import Link from "next/link";
 import { LoginForm } from "./login-form";
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ registered?: string }> }) {
-  const { registered } = await searchParams;
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ verify?: string; verified?: string }>;
+}) {
+  const { verify, verified } = await searchParams;
+  const banner =
+    verified === "1"
+      ? { tone: "ok" as const, text: "Email verified — you can sign in now." }
+      : verify === "sent"
+        ? { tone: "ok" as const, text: "Almost there — check your inbox and click the link to verify your email." }
+        : verify === "invalid"
+          ? { tone: "err" as const, text: "That verification link is invalid or expired. Sign in below to resend it." }
+          : null;
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--app-bg)] px-4">
       <div className="w-full max-w-sm">
@@ -17,9 +29,16 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <div className="rounded-[16px] border border-[var(--border)] bg-[var(--card)] p-7">
           <h1 className="text-[16px] font-bold">Sign in</h1>
           <p className="mt-1 text-[13px] text-[var(--text-dim)]">Welcome back — sign in to your workspace.</p>
-          {registered && (
-            <p className="mt-3 rounded-[8px] border border-[#34301a] bg-[rgba(116,217,160,.08)] px-3 py-2 text-[12.5px] text-[var(--positive)]">
-              Account created — sign in to continue.
+          {banner && (
+            <p
+              className="mt-3 rounded-[8px] px-3 py-2 text-[12.5px]"
+              style={
+                banner.tone === "ok"
+                  ? { background: "rgba(116,217,160,.10)", color: "var(--positive)" }
+                  : { background: "rgba(242,134,138,.10)", color: "var(--negative)" }
+              }
+            >
+              {banner.text}
             </p>
           )}
           <LoginForm />
