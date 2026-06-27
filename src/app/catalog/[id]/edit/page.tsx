@@ -4,10 +4,12 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { prisma } from "@/lib/db";
 import { CatalogForm } from "../../catalog-form";
+import { requireOrg } from "@/lib/tenant";
 
 export default async function EditCatalogItemPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const item = await prisma.catalogItem.findUnique({ where: { id } });
+  const { orgId } = await requireOrg("MEMBER");
+  const item = await prisma.catalogItem.findFirst({ where: { id, orgId } });
   if (!item) notFound();
 
   return (

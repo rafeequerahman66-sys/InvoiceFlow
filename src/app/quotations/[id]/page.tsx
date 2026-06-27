@@ -9,11 +9,13 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Badge, statusTone } from "@/components/ui/badge";
 import { DocumentLineTable } from "@/components/document-line-table";
 import { QuoteActions } from "./quote-actions";
+import { requireOrg } from "@/lib/tenant";
 
 export default async function QuoteDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const quote = await prisma.quotation.findUnique({
-    where: { id },
+  const { orgId } = await requireOrg();
+  const quote = await prisma.quotation.findFirst({
+    where: { id, orgId },
     include: { items: true, client: true },
   });
   if (!quote) notFound();

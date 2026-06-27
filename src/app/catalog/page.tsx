@@ -9,9 +9,11 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { Icon } from "@/components/icon";
+import { requireOrg } from "@/lib/tenant";
 
 export default async function CatalogPage() {
-  const items = await prisma.catalogItem.findMany({ where: { archived: false }, orderBy: { name: "asc" } });
+  const { orgId } = await requireOrg();
+  const items = await prisma.catalogItem.findMany({ where: { orgId, archived: false }, orderBy: { name: "asc" } });
 
   return (
     <AppShell

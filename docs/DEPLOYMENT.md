@@ -48,6 +48,16 @@ npm run start        # or deploy to Vercel
 - Create a client → invoice → record payment → open `/api/pdf` and the print view.
 - Verify the public link `/share/invoice/[id]` loads without auth for a non-draft invoice.
 
+## @supabase/server SDK (server-side)
+Used by `src/lib/supabase.ts` (`supabaseAdmin()` / `supabaseAnon()`) and the example route `/api/supabase`. This is **separate** from the Prisma data path — it talks to the Supabase project's REST API directly, and is server-only (the secret key must never reach the client).
+
+- The dependency is in `package.json`, so Vercel's `npm install` (and `vercel-build`) installs it automatically — no build step change needed, and the build does **not** require the env vars (handlers are `force-dynamic`, nothing runs at build).
+- **Runtime** needs these env vars set in Vercel (from Supabase → Connect). Without them, only `/api/supabase` (and any code calling the helpers) errors — the rest of the app is unaffected:
+  - `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_JWKS_URL`
+  - Keep `SUPABASE_SECRET_KEY` in Vercel env only — never commit it.
+- The example route uses `auth: "secret"` (server-to-server; caller must send the secret key in the `apikey` header). It does **not** use Supabase Auth "user" JWTs, since app users authenticate via NextAuth.
+- On Supabase Edge Functions the `SUPABASE_*` vars are injected automatically; for non-"user" auth modes set `verify_jwt = false` in `supabase/config.toml`. (Not applicable to this Next.js deploy.)
+
 ## Notes
 - `next@15.1.6` has a known advisory (CVE-2025-66478) — upgrade to a patched 15.x before production.
-- Fill real bank/LUT/SAC and logo in `BusinessProfile` (seed or a future settings screen) before sending real invoices.
+- Fill real org profile (GSTIN, bank, LUT) per workspace in **Settings** before sending real invoices.

@@ -2,41 +2,63 @@ export const dynamic = "force-dynamic";
 
 import { AppShell } from "@/components/app-shell";
 import { prisma } from "@/lib/db";
+import { requireOrg, hasRole } from "@/lib/tenant";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { OrgSettingsForm } from "./org-settings-form";
+import { TeamManager } from "./team-manager";
 
 export default async function SettingsPage() {
-  const profile = await prisma.businessProfile.findUnique({ where: { id: "rinmedia" } });
+  const ctx = await requireOrg();
+  const [org, members] = await Promise.all([
+    prisma.organization.findUnique({ where: { id: ctx.orgId } }),
+    prisma.membership.findMany({ where: { orgId: ctx.orgId }, include: { user: true }, orderBy: { createdAt: "asc" } }),
+  ]);
+  if (!org) return null;
 
-  const rows: [string, string][] = [
-    ["Legal name", profile?.legalName ?? "—"],
-    ["Brand name", profile?.brandName ?? "—"],
-    ["GSTIN", profile?.gstin ?? "—"],
-    ["State code", profile?.stateCode ?? "—"],
-    ["Email", profile?.email ?? "—"],
-    ["Invoice prefix", profile?.invoicePrefix ?? "INV"],
-    ["Quote prefix", profile?.quotePrefix ?? "QT"],
-    ["Bank", profile?.bankName ?? "—"],
-    ["IFSC", profile?.ifsc ?? "—"],
-  ];
+  const canManage = hasRole(ctx.role, "ADMIN");
 
   return (
-    <AppShell title="Settings" subtitle="Company profile & preferences" action={null}>
-      <div className="max-w-2xl">
+    <AppShell title="Settings" subtitle="Company profile & team" action={null}>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader>Company Profile</CardHeader>
-          <CardBody className="divide-y divide-[var(--row-divider)]">
-            {rows.map(([k, v]) => (
-              <div key={k} className="flex justify-between py-2.5 text-[13px]">
-                <span className="text-[var(--text-soft)]">{k}</span>
-                <span className="font-medium text-[var(--text)]">{v}</span>
-              </div>
-            ))}
+          <CardHeader>Company profile</CardHeader>
+          <CardBody>
+            <OrgSettingsForm
+              canEdit={canManage}
+              initial={{
+                name: org.name,
+                legalName: org.legalName ?? "",
+                gstin: org.gstin ?? "",
+                stateCode: org.stateCode,
+                address: org.address ?? "",
+                email: org.email ?? "",
+                phone: org.phone ?? "",
+                bankName: org.bankName ?? "",
+                bankAccount: org.bankAccount ?? "",
+                ifsc: org.ifsc ?? "",
+                lutNumber: org.lutNumber ?? "",
+                invoicePrefix: org.invoicePrefix,
+                quotePrefix: org.quotePrefix,
+              }}
+            />
           </CardBody>
         </Card>
-        <p className="mt-3 text-[12px] text-[var(--text-dim)]">
-          Editable Company / Branding / Tax & GST tabs are on the roadmap. Values currently come from the seeded
-          business profile.
-        </p>
+
+        <Card className="h-fit">
+          <CardHeader>Team</CardHeader>
+          <CardBody>
+            <TeamManager
+              canManage={canManage}
+              members={members.map((m) => ({
+                id: m.id,
+                name: m.user.name,
+                email: m.user.email,
+                role: m.role,
+                isYou: m.user.email === ctx.userEmail,
+              }))}
+            />
+          </CardBody>
+        </Card>
       </div>
     </AppShell>
   );

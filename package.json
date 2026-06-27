@@ -11,7 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "postinstall": "node scripts/prisma-generate.mjs",
-    "vercel-build": "node scripts/prisma-generate.mjs && prisma db push --schema=prisma/schema.postgres.prisma --skip-generate && next build",
+    "vercel-build": "node scripts/prisma-generate.mjs && prisma db push --schema=prisma/schema.postgres.prisma --skip-generate --accept-data-loss && next build",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio"
@@ -22,6 +22,8 @@
   "dependencies": {
     "@prisma/client": "^6.2.0",
     "@react-pdf/renderer": "^4.5.1",
+    "@supabase/server": "^1.2.0",
+    "bcryptjs": "^3.0.3",
     "next": "^15.1.11",
     "next-auth": "5.0.0-beta.25",
     "react": "19.0.0",
@@ -29,6 +31,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

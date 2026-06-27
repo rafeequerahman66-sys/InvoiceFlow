@@ -10,11 +10,13 @@ import { ButtonLink } from "@/components/ui/button";
 import { Badge, statusTone } from "@/components/ui/badge";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { ClientDangerZone } from "./client-danger";
+import { requireOrg } from "@/lib/tenant";
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const client = await prisma.client.findUnique({
-    where: { id },
+  const { orgId } = await requireOrg();
+  const client = await prisma.client.findFirst({
+    where: { id, orgId },
     include: {
       invoices: { orderBy: { createdAt: "desc" } },
       quotes: { orderBy: { createdAt: "desc" } },

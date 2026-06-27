@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { requireOrg } from "@/lib/tenant";
 import { toNum } from "@/lib/money";
 import { gstSummaryByQuarter, type ReportInvoice } from "@/lib/reports";
 
@@ -24,10 +25,11 @@ function csvResponse(name: string, csv: string) {
 }
 
 export async function GET(req: NextRequest) {
+  const { orgId } = await requireOrg("VIEWER");
   const type = req.nextUrl.searchParams.get("type") ?? "invoices";
 
   if (type === "gst") {
-    const invoices = await prisma.invoice.findMany({ orderBy: { issueDate: "asc" } });
+    const invoices = await prisma.invoice.findMany({ where: { orgId }, orderBy: { issueDate: "asc" } });
     const rows: ReportInvoice[] = invoices.map((i) => ({
       status: i.status,
       issueDate: i.issueDate,
@@ -49,6 +51,7 @@ export async function GET(req: NextRequest) {
 
   // Default: invoices export
   const invoices = await prisma.invoice.findMany({
+    where: { orgId },
     include: { client: true },
     orderBy: { issueDate: "desc" },
   });

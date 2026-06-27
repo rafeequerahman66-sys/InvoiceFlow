@@ -7,6 +7,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { Icon } from "@/components/icon";
+import { requireOrg } from "@/lib/tenant";
 
 const COUNTRY_NAMES: Record<string, string> = {
   IN: "India", US: "USA", GB: "UK", DE: "Germany", AE: "UAE",
@@ -14,7 +15,8 @@ const COUNTRY_NAMES: Record<string, string> = {
 };
 
 export default async function ClientsPage() {
-  const clients = await prisma.client.findMany({ where: { archived: false }, orderBy: { name: "asc" } });
+  const { orgId } = await requireOrg();
+  const clients = await prisma.client.findMany({ where: { orgId, archived: false }, orderBy: { name: "asc" } });
 
   return (
     <AppShell

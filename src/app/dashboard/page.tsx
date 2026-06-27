@@ -9,14 +9,16 @@ import { Badge, statusTone } from "@/components/ui/badge";
 import { RevenueChart, type MonthPoint } from "@/components/revenue-chart";
 import { StatusDonut } from "@/components/status-donut";
 import { Icon, type IconName } from "@/components/icon";
+import { requireOrg } from "@/lib/tenant";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export default async function DashboardPage() {
+  const { orgId } = await requireOrg();
   const [recent, all, recentQuotes] = await Promise.all([
-    prisma.invoice.findMany({ include: { client: true }, orderBy: { issueDate: "desc" }, take: 6 }),
-    prisma.invoice.findMany(),
-    prisma.quotation.findMany({ include: { client: true }, orderBy: { createdAt: "desc" }, take: 5 }),
+    prisma.invoice.findMany({ where: { orgId }, include: { client: true }, orderBy: { issueDate: "desc" }, take: 6 }),
+    prisma.invoice.findMany({ where: { orgId } }),
+    prisma.quotation.findMany({ where: { orgId }, include: { client: true }, orderBy: { createdAt: "desc" }, take: 5 }),
   ]);
 
   let revenue = 0, pending = 0, overdue = 0, paidCount = 0, pendingCount = 0, overdueCount = 0;

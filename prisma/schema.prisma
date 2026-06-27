@@ -1,12 +1,9 @@
-// Prisma schema for InvoiceFlow — Rin Media internal billing tool.
+// Prisma schema for InvoiceFlow — multi-tenant SaaS (LOCAL DEV = SQLite).
 //
-// LOCAL DEV uses SQLite (file-based, fast, offline) because this machine's
-// network path to Supabase is slow/flaky. The canonical PRODUCTION schema
-// (PostgreSQL, with real enums + @db types + Json) is kept in
-// prisma/schema.postgres.prisma. To use Supabase: copy that over this file,
-// set DATABASE_URL to the Supabase URL, and run `prisma migrate deploy`.
-// SQLite has no native enums / @db types / Json, so enum fields are String
-// (allowed values noted below) and ActivityLog.meta is JSON-encoded text.
+// Row-level multi-tenancy: every tenant table carries orgId and is scoped per
+// Organization. SQLite has no native enums/@db/Json, so enum-ish fields are
+// String (allowed values in comments). Production schema (Postgres, with real
+// enums + @db + Json) is prisma/schema.postgres.prisma — keep them in lockstep.
 generator client {
   provider = "prisma-client-js"
 }
@@ -16,22 +13,23 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// String-enum values:
-// Role: OWNER|MEMBER · ItemKind: SERVICE|PRODUCT · DiscountType: PERCENT|FLAT
-// SupplyType: INTRA_STATE|INTER_STATE|EXPORT_LUT|EXPORT_WITH_TAX
+// Role: OWNER|ADMIN|MEMBER|VIEWER · ItemKind: SERVICE|PRODUCT
+// DiscountType: PERCENT|FLAT · SupplyType: INTRA_STATE|INTER_STATE|EXPORT_LUT|EXPORT_WITH_TAX
 // InvoiceStatus: DRAFT|SENT|PARTIALLY_PAID|PAID|OVERDUE|CANCELLED
 // QuoteStatus: DRAFT|SENT|ACCEPTED|REJECTED|EXPIRED|CONVERTED
 // PaymentMethod: BANK_TRANSFER|UPI|RAZORPAY|CRYPTO|OTHER · DocType: INVOICE|QUOTE
+// Cadence: WEEKLY|MONTHLY|QUARTERLY|YEARLY
 
-/// Singleton: Rin Media's own details. Seed exactly one row (id = "rinmedia").
-model BusinessProfile {
-  id             String   @id @default("rinmedia")
-  legalName      String   @default("Crew Catalyst Innovations Private Limited")
-  brandName      String   @default("Rin Media")
-  gstin          String   @default("32AANCC1730B1ZB")
+/// A tenant. Holds the business profile that used to be the BusinessProfile singleton.
+model Organization {
+  id             String   @id @default(cuid())
+  name           String
+  slug           String   @unique
+  legalName      String?
+  gstin          String?
   stateCode      String   @default("32")
-  address        String
-  email          String
+  address        String?
+  email          String?
   phone          String?
   lutNumber      String?
   defaultSacCode String?  @default("998361")
@@ -42,67 +40,103 @@ model BusinessProfile {
   logoUrl        String?
   invoicePrefix  String   @default("INV")
   quotePrefix    String   @default("QT")
+  createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  memberships     Membership[]
+  clients         Client[]
+  catalogItems    CatalogItem[]
+  invoices        Invoice[]
+  quotes          Quotation[]
+  recurring       RecurringInvoice[]
+  numberSequences NumberSequence[]
+  logs            ActivityLog[]
 }
 
 model User {
-  id        String        @id @default(cuid())
-  email     String        @unique
-  name      String?
-  role      String        @default("MEMBER")
-  invoices  Invoice[]
-  quotes    Quotation[]
-  recurring RecurringInvoice[]
-  logs      ActivityLog[]
-  createdAt DateTime      @default(now())
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String?
+  passwordHash String?
+  memberships  Membership[]
+  invoices     Invoice[]
+  quotes       Quotation[]
+  recurring    RecurringInvoice[]
+  logs         ActivityLog[]
+  createdAt    DateTime      @default(now())
+}
+
+/// Links a user to an org with a role.
+model Membership {
+  id        String       @id @default(cuid())
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  orgId     String
+  role      String       @default("MEMBER")
+  createdAt DateTime     @default(now())
+
+  @@unique([userId, orgId])
+  @@index([orgId])
 }
 
 model Client {
-  id              String      @id @default(cuid())
+  id              String       @id @default(cuid())
+  org             Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  orgId           String
   name            String
   company         String?
   email           String?
   phone           String?
   billingAddress  String?
-  country         String      @default("IN")
+  country         String       @default("IN")
   stateCode       String?
   gstin           String?
-  defaultCurrency String      @default("INR")
+  defaultCurrency String       @default("INR")
   notes           String?
   invoices        Invoice[]
   quotes          Quotation[]
   recurring       RecurringInvoice[]
-  archived        Boolean     @default(false)
-  createdAt       DateTime    @default(now())
+  archived        Boolean      @default(false)
+  createdAt       DateTime     @default(now())
 
-  @@index([company])
+  @@index([orgId])
+  @@index([orgId, company])
 }
 
 model CatalogItem {
-  id          String   @id @default(cuid())
+  id          String       @id @default(cuid())
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  orgId       String
   name        String
   description String?
-  kind        String   @default("SERVICE")
+  kind        String       @default("SERVICE")
   sacCode     String?
   defaultRate Decimal
-  defaultTax  Decimal  @default(18)
-  archived    Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  defaultTax  Decimal      @default(18)
+  archived    Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+
+  @@index([orgId])
 }
 
-/// Gapless sequential numbering, one counter per financial year per doc type.
+/// Gapless sequential numbering, one counter per org per FY per doc type.
 model NumberSequence {
-  id         String @id @default(cuid())
+  id         String       @id @default(cuid())
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  orgId      String
   docType    String
   fyLabel    String
-  lastNumber Int    @default(0)
+  lastNumber Int          @default(0)
 
-  @@unique([docType, fyLabel])
+  @@unique([orgId, docType, fyLabel])
 }
 
 model Invoice {
   id             String        @id @default(cuid())
-  number         String        @unique
+  org            Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  orgId          String
+  number         String
   fyLabel        String
   client         Client        @relation(fields: [clientId], references: [id])
   clientId       String
@@ -133,8 +167,9 @@ model Invoice {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  @@index([clientId, status])
-  @@index([issueDate])
+  @@unique([orgId, number])
+  @@index([orgId, status])
+  @@index([orgId, issueDate])
 }
 
 model InvoiceItem {
@@ -154,19 +189,21 @@ model InvoiceItem {
 }
 
 model Quotation {
-  id                 String      @id @default(cuid())
-  number             String      @unique
+  id                 String       @id @default(cuid())
+  org                Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  orgId              String
+  number             String
   fyLabel            String
-  client             Client      @relation(fields: [clientId], references: [id])
+  client             Client       @relation(fields: [clientId], references: [id])
   clientId           String
-  status             String      @default("DRAFT")
+  status             String       @default("DRAFT")
   issueDate          DateTime
   validTill          DateTime
-  currency           String      @default("INR")
+  currency           String       @default("INR")
   supplyType         String
   subtotal           Decimal
-  discountType       String      @default("PERCENT")
-  discountValue      Decimal     @default(0)
+  discountType       String       @default("PERCENT")
+  discountValue      Decimal      @default(0)
   taxableValue       Decimal
   totalTax           Decimal
   total              Decimal
@@ -174,12 +211,13 @@ model Quotation {
   terms              String?
   convertedInvoiceId String?
   items              QuoteItem[]
-  createdBy          User        @relation(fields: [createdById], references: [id])
+  createdBy          User         @relation(fields: [createdById], references: [id])
   createdById        String
-  createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
-  @@index([clientId, status])
+  @@unique([orgId, number])
+  @@index([orgId, status])
 }
 
 model QuoteItem {
@@ -211,25 +249,30 @@ model Payment {
 }
 
 model ActivityLog {
-  id         String   @id @default(cuid())
-  actor      User?    @relation(fields: [actorId], references: [id])
+  id         String        @id @default(cuid())
+  org        Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  orgId      String?
+  actor      User?         @relation(fields: [actorId], references: [id])
   actorId    String?
   action     String
   entityType String
   entityId   String
   meta       String?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime      @default(now())
 
+  @@index([orgId])
   @@index([entityType, entityId])
 }
 
 /// Template that auto-generates invoices on a cadence (retainers).
 model RecurringInvoice {
   id            String          @id @default(cuid())
+  org           Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  orgId         String
   title         String?
   client        Client          @relation(fields: [clientId], references: [id])
   clientId      String
-  cadence       String          @default("MONTHLY") // WEEKLY|MONTHLY|QUARTERLY|YEARLY
+  cadence       String          @default("MONTHLY")
   nextRunDate   DateTime
   active        Boolean         @default(true)
   currency      String          @default("INR")
@@ -245,7 +288,7 @@ model RecurringInvoice {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
-  @@index([active, nextRunDate])
+  @@index([orgId, active, nextRunDate])
 }
 
 model RecurringItem {

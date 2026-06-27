@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { requireOrg } from "@/lib/tenant";
 import { toNum } from "@/lib/money";
 
 /**
@@ -14,15 +15,16 @@ import { toNum } from "@/lib/money";
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
+  const { orgId } = await requireOrg();
   const id = req.nextUrl.searchParams.get("invoiceId");
   if (!id) return new NextResponse("invoiceId required", { status: 400 });
 
-  const invoice = await prisma.invoice.findUnique({
-    where: { id },
-    include: { items: true, client: true },
+  const invoice = await prisma.invoice.findFirst({
+    where: { id, orgId },
+    include: { items: true, client: true, org: true },
   });
   if (!invoice) return new NextResponse("Not found", { status: 404 });
-  const profile = await prisma.businessProfile.findUnique({ where: { id: "rinmedia" } });
+  const profile = invoice.org;
 
   try {
     // Imported lazily so a load failure can't crash unrelated routes.
@@ -33,11 +35,11 @@ export async function GET(req: NextRequest) {
       InvoiceDocument({
         business: profile
           ? {
-              brandName: profile.brandName,
-              legalName: profile.legalName,
-              gstin: profile.gstin,
-              address: profile.address,
-              email: profile.email,
+              brandName: profile.name,
+              legalName: profile.legalName ?? profile.name,
+              gstin: profile.gstin ?? "",
+              address: profile.address ?? "",
+              email: profile.email ?? "",
               bankName: profile.bankName,
               bankAccount: profile.bankAccount,
               ifsc: profile.ifsc,

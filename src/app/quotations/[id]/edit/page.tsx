@@ -5,15 +5,17 @@ import { AppShell } from "@/components/app-shell";
 import { prisma } from "@/lib/db";
 import { QuoteForm } from "../../new/quote-form";
 import type { SupplyType } from "@/lib/tax";
+import { requireOrg } from "@/lib/tenant";
 
 export default async function EditQuotePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const quote = await prisma.quotation.findUnique({ where: { id }, include: { items: true } });
+  const { orgId } = await requireOrg("MEMBER");
+  const quote = await prisma.quotation.findFirst({ where: { id, orgId }, include: { items: true } });
   if (!quote) notFound();
   if (quote.status !== "DRAFT") redirect(`/quotations/${id}`);
 
-  const clients = await prisma.client.findMany({ where: { archived: false }, orderBy: { name: "asc" } });
-  const catalog = await prisma.catalogItem.findMany({ where: { archived: false } });
+  const clients = await prisma.client.findMany({ where: { orgId, archived: false }, orderBy: { name: "asc" } });
+  const catalog = await prisma.catalogItem.findMany({ where: { orgId, archived: false } });
 
   return (
     <AppShell title={`Edit ${quote.number}`} subtitle="Draft quotation" action={null}>

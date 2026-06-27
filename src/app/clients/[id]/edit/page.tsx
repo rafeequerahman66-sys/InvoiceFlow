@@ -4,10 +4,12 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { prisma } from "@/lib/db";
 import { ClientForm } from "../../new/client-form";
+import { requireOrg } from "@/lib/tenant";
 
 export default async function EditClientPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const client = await prisma.client.findUnique({ where: { id } });
+  const { orgId } = await requireOrg("MEMBER");
+  const client = await prisma.client.findFirst({ where: { id, orgId } });
   if (!client) notFound();
 
   return (

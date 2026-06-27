@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { currentUserId } from "@/lib/session";
+import { requireOrg } from "@/lib/tenant";
 import { nextNumber } from "@/lib/numbering";
 import { getFxRateToInr } from "@/lib/fx";
 import {
@@ -15,13 +15,12 @@ import {
 } from "@/lib/tax";
 import { getMailer } from "@/lib/integrations/email";
 import { createQuoteSchema, type CreateQuoteInput } from "@/lib/validators";
+
 type QuoteStatus = "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED" | "EXPIRED" | "CONVERTED";
 
-const QUOTE_PREFIX = "QT";
-
-/** Shared: compute totals + persist a quote (create or replace items on update). */
-async function buildQuoteData(data: CreateQuoteInput) {
-  const client = await prisma.client.findUniqueOrThrow({ where: { id: data.clientId } });
+async function buildQuoteData(orgId: string, data: CreateQuoteInput) {
+  const client = await prisma.client.findFirst({ where: { id: data.clientId, orgId } });
+  if (!client) throw new Error("Client not found");
   const supplyType: SupplyType =
     data.supplyType ?? resolveSupplyType({ country: client.country, stateCode: client.stateCode });
   const totals = computeInvoiceTotals(
@@ -34,13 +33,14 @@ async function buildQuoteData(data: CreateQuoteInput) {
 
 export async function createQuote(input: CreateQuoteInput) {
   const data = createQuoteSchema.parse(input);
-  const userId = await currentUserId();
-  const { client, supplyType, totals } = await buildQuoteData(data);
+  const { userId, orgId } = await requireOrg("MEMBER");
+  const { client, supplyType, totals } = await buildQuoteData(orgId, data);
 
   const quote = await prisma.$transaction(async (tx) => {
-    const { number, fyLabel } = await nextNumber(tx, "QUOTE", QUOTE_PREFIX, data.issueDate);
+    const { number, fyLabel } = await nextNumber(tx, orgId, "QUOTE", "QT", data.issueDate);
     return tx.quotation.create({
       data: {
+        orgId,
         number,
         fyLabel,
         clientId: client.id,
@@ -59,14 +59,14 @@ export async function createQuote(input: CreateQuoteInput) {
         terms: data.terms ?? null,
         createdById: userId,
         items: {
-          create: data.items.map((item, idx) => ({
+          create: data.items.map((item) => ({
             name: item.name,
             description: item.description ?? null,
             sacCode: item.sacCode ?? null,
             qty: item.qty,
             rate: item.rate,
             taxRate: item.taxRate,
-            lineTotal: totals.lines[idx].lineTotal,
+            lineTotal: round2(item.qty * item.rate),
           })),
         },
       },
@@ -79,9 +79,11 @@ export async function createQuote(input: CreateQuoteInput) {
 
 export async function updateQuote(quoteId: string, input: CreateQuoteInput) {
   const data = createQuoteSchema.parse(input);
-  const existing = await prisma.quotation.findUniqueOrThrow({ where: { id: quoteId } });
+  const { orgId } = await requireOrg("MEMBER");
+  const existing = await prisma.quotation.findFirst({ where: { id: quoteId, orgId } });
+  if (!existing) throw new Error("Quotation not found");
   if (existing.status !== "DRAFT") throw new Error("Only draft quotations can be edited");
-  const { supplyType, totals } = await buildQuoteData(data);
+  const { supplyType, totals } = await buildQuoteData(orgId, data);
 
   await prisma.$transaction(async (tx) => {
     await tx.quoteItem.deleteMany({ where: { quoteId } });
@@ -102,14 +104,14 @@ export async function updateQuote(quoteId: string, input: CreateQuoteInput) {
         notes: data.notes ?? null,
         terms: data.terms ?? null,
         items: {
-          create: data.items.map((item, idx) => ({
+          create: data.items.map((item) => ({
             name: item.name,
             description: item.description ?? null,
             sacCode: item.sacCode ?? null,
             qty: item.qty,
             rate: item.rate,
             taxRate: item.taxRate,
-            lineTotal: totals.lines[idx].lineTotal,
+            lineTotal: round2(item.qty * item.rate),
           })),
         },
       },
@@ -121,13 +123,16 @@ export async function updateQuote(quoteId: string, input: CreateQuoteInput) {
 }
 
 export async function updateQuoteStatus(quoteId: string, status: QuoteStatus) {
-  await prisma.quotation.update({ where: { id: quoteId }, data: { status } });
+  const { orgId } = await requireOrg("MEMBER");
+  await prisma.quotation.updateMany({ where: { id: quoteId, orgId }, data: { status } });
   revalidatePath(`/quotations/${quoteId}`);
   revalidatePath("/quotations");
 }
 
 export async function deleteQuote(quoteId: string) {
-  const q = await prisma.quotation.findUniqueOrThrow({ where: { id: quoteId } });
+  const { orgId } = await requireOrg("MEMBER");
+  const q = await prisma.quotation.findFirst({ where: { id: quoteId, orgId } });
+  if (!q) throw new Error("Quotation not found");
   if (q.status === "CONVERTED") throw new Error("Converted quotations cannot be deleted");
   await prisma.quotation.delete({ where: { id: quoteId } });
   revalidatePath("/quotations");
@@ -135,16 +140,15 @@ export async function deleteQuote(quoteId: string) {
 }
 
 export async function duplicateQuote(quoteId: string) {
-  const src = await prisma.quotation.findUniqueOrThrow({
-    where: { id: quoteId },
-    include: { items: true },
-  });
-  const userId = await currentUserId();
+  const { userId, orgId } = await requireOrg("MEMBER");
+  const src = await prisma.quotation.findFirst({ where: { id: quoteId, orgId }, include: { items: true } });
+  if (!src) throw new Error("Quotation not found");
 
   const copy = await prisma.$transaction(async (tx) => {
-    const { number, fyLabel } = await nextNumber(tx, "QUOTE", QUOTE_PREFIX, new Date());
+    const { number, fyLabel } = await nextNumber(tx, orgId, "QUOTE", "QT", new Date());
     return tx.quotation.create({
       data: {
+        orgId,
         number,
         fyLabel,
         clientId: src.clientId,
@@ -182,16 +186,11 @@ export async function duplicateQuote(quoteId: string) {
 }
 
 export async function sendQuote(quoteId: string) {
-  const q = await prisma.quotation.findUniqueOrThrow({
-    where: { id: quoteId },
-    include: { client: true },
-  });
+  const { orgId } = await requireOrg("MEMBER");
+  const q = await prisma.quotation.findFirst({ where: { id: quoteId, orgId }, include: { client: true } });
+  if (!q) throw new Error("Quotation not found");
   if (q.client.email) {
-    await getMailer().send({
-      to: q.client.email,
-      template: "QUOTE",
-      data: { number: q.number, clientName: q.client.name },
-    });
+    await getMailer().send({ to: q.client.email, template: "QUOTE", data: { number: q.number, clientName: q.client.name } });
   }
   if (q.status === "DRAFT") {
     await prisma.quotation.update({ where: { id: quoteId }, data: { status: "SENT" } });
@@ -199,35 +198,32 @@ export async function sendQuote(quoteId: string) {
   revalidatePath(`/quotations/${quoteId}`);
 }
 
-/** Convert an accepted quote into a draft invoice, mirroring its line items. */
+/** Convert a quote into a draft invoice within the same org. */
 export async function convertQuoteToInvoice(quoteId: string) {
-  const userId = await currentUserId();
-  const quote = await prisma.quotation.findUniqueOrThrow({
-    where: { id: quoteId },
+  const { userId, orgId } = await requireOrg("MEMBER");
+  const quote = await prisma.quotation.findFirst({
+    where: { id: quoteId, orgId },
     include: { items: true, client: true },
   });
+  if (!quote) throw new Error("Quotation not found");
   if (quote.convertedInvoiceId) redirect(`/invoices/${quote.convertedInvoiceId}`);
 
-  const items = quote.items.map((it) => ({
-    qty: Number(it.qty),
-    rate: Number(it.rate),
-    taxRate: Number(it.taxRate),
-  }));
-  const totals = computeInvoiceTotals(quote.supplyType as SupplyType, items, {
+  const items = quote.items.map((it) => ({ qty: Number(it.qty), rate: Number(it.rate), taxRate: Number(it.taxRate) }));
+  const supplyType = quote.supplyType as SupplyType;
+  const totals = computeInvoiceTotals(supplyType, items, {
     type: quote.discountType as "PERCENT" | "FLAT",
     value: Number(quote.discountValue),
   });
   const fxRate = await getFxRateToInr(quote.currency, new Date());
   const totalInr = round2(totals.total * fxRate);
   const placeOfSupply =
-    quote.supplyType === "EXPORT_LUT" || quote.supplyType === "EXPORT_WITH_TAX"
-      ? "Export of services"
-      : quote.client.stateCode ?? null;
+    supplyType === "EXPORT_LUT" || supplyType === "EXPORT_WITH_TAX" ? "Export of services" : quote.client.stateCode ?? null;
 
   const invoice = await prisma.$transaction(async (tx) => {
-    const { number, fyLabel } = await nextNumber(tx, "INVOICE", "INV", new Date());
+    const { number, fyLabel } = await nextNumber(tx, orgId, "INVOICE", "INV", new Date());
     const inv = await tx.invoice.create({
       data: {
+        orgId,
         number,
         fyLabel,
         clientId: quote.clientId,
@@ -236,7 +232,7 @@ export async function convertQuoteToInvoice(quoteId: string) {
         dueDate: new Date(Date.now() + 15 * 86400000),
         currency: quote.currency,
         fxRateToInr: fxRate,
-        supplyType: quote.supplyType,
+        supplyType,
         placeOfSupply,
         subtotal: totals.subtotal,
         discountType: quote.discountType,
@@ -249,7 +245,7 @@ export async function convertQuoteToInvoice(quoteId: string) {
         totalInr,
         notes: quote.notes,
         terms: quote.terms,
-        lutDeclaration: needsLutDeclaration(quote.supplyType as SupplyType),
+        lutDeclaration: needsLutDeclaration(supplyType),
         createdById: userId,
         items: {
           create: quote.items.map((it, idx) => ({
@@ -266,15 +262,13 @@ export async function convertQuoteToInvoice(quoteId: string) {
         },
       },
     });
-    await tx.quotation.update({
-      where: { id: quoteId },
-      data: { status: "CONVERTED", convertedInvoiceId: inv.id },
-    });
+    await tx.quotation.update({ where: { id: quoteId }, data: { status: "CONVERTED", convertedInvoiceId: inv.id } });
     return inv;
   });
 
   await prisma.activityLog.create({
     data: {
+      orgId,
       actorId: userId,
       action: "quote.converted",
       entityType: "Quotation",

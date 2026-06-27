@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { currentUserId } from "@/lib/session";
+import { requireOrg } from "@/lib/tenant";
 import { nextNumber } from "@/lib/numbering";
 import { getFxRateToInr } from "@/lib/fx";
 import { getMailer } from "@/lib/integrations/email";
@@ -21,11 +21,13 @@ import {
   type CreateInvoiceInput,
   type PaymentInput,
 } from "@/lib/validators";
+
 type InvoiceStatus = "DRAFT" | "SENT" | "PARTIALLY_PAID" | "PAID" | "OVERDUE" | "CANCELLED";
 
-/** Resolve supply type + computed totals + fx for a payload. */
-async function buildInvoice(data: CreateInvoiceInput) {
-  const client = await prisma.client.findUniqueOrThrow({ where: { id: data.clientId } });
+/** Resolve supply type + computed totals + fx for a payload, scoped to org. */
+async function buildInvoice(orgId: string, data: CreateInvoiceInput) {
+  const client = await prisma.client.findFirst({ where: { id: data.clientId, orgId } });
+  if (!client) throw new Error("Client not found");
   const supplyType: SupplyType =
     data.supplyType ?? resolveSupplyType({ country: client.country, stateCode: client.stateCode });
   const totals = computeInvoiceTotals(
@@ -44,13 +46,14 @@ async function buildInvoice(data: CreateInvoiceInput) {
 
 export async function createInvoice(input: CreateInvoiceInput) {
   const data = createInvoiceSchema.parse(input);
-  const userId = await currentUserId();
-  const { client, supplyType, totals, fxRate, totalInr, placeOfSupply } = await buildInvoice(data);
+  const { userId, orgId } = await requireOrg("MEMBER");
+  const { client, supplyType, totals, fxRate, totalInr, placeOfSupply } = await buildInvoice(orgId, data);
 
   const invoice = await prisma.$transaction(async (tx) => {
-    const { number, fyLabel } = await nextNumber(tx, "INVOICE", "INV", data.issueDate);
+    const { number, fyLabel } = await nextNumber(tx, orgId, "INVOICE", "INV", data.issueDate);
     return tx.invoice.create({
       data: {
+        orgId,
         number,
         fyLabel,
         clientId: client.id,
@@ -94,6 +97,7 @@ export async function createInvoice(input: CreateInvoiceInput) {
 
   await prisma.activityLog.create({
     data: {
+      orgId,
       actorId: userId,
       action: "invoice.created",
       entityType: "Invoice",
@@ -109,9 +113,11 @@ export async function createInvoice(input: CreateInvoiceInput) {
 
 export async function updateInvoice(invoiceId: string, input: CreateInvoiceInput) {
   const data = createInvoiceSchema.parse(input);
-  const existing = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
+  const { orgId } = await requireOrg("MEMBER");
+  const existing = await prisma.invoice.findFirst({ where: { id: invoiceId, orgId } });
+  if (!existing) throw new Error("Invoice not found");
   if (existing.status !== "DRAFT") throw new Error("Only draft invoices can be edited");
-  const { supplyType, totals, fxRate, totalInr, placeOfSupply } = await buildInvoice(data);
+  const { supplyType, totals, fxRate, totalInr, placeOfSupply } = await buildInvoice(orgId, data);
 
   await prisma.$transaction(async (tx) => {
     await tx.invoiceItem.deleteMany({ where: { invoiceId } });
@@ -160,16 +166,15 @@ export async function updateInvoice(invoiceId: string, input: CreateInvoiceInput
 }
 
 export async function duplicateInvoice(invoiceId: string) {
-  const src = await prisma.invoice.findUniqueOrThrow({
-    where: { id: invoiceId },
-    include: { items: true },
-  });
-  const userId = await currentUserId();
+  const { userId, orgId } = await requireOrg("MEMBER");
+  const src = await prisma.invoice.findFirst({ where: { id: invoiceId, orgId }, include: { items: true } });
+  if (!src) throw new Error("Invoice not found");
 
   const copy = await prisma.$transaction(async (tx) => {
-    const { number, fyLabel } = await nextNumber(tx, "INVOICE", "INV", new Date());
+    const { number, fyLabel } = await nextNumber(tx, orgId, "INVOICE", "INV", new Date());
     return tx.invoice.create({
       data: {
+        orgId,
         number,
         fyLabel,
         clientId: src.clientId,
@@ -216,8 +221,9 @@ export async function duplicateInvoice(invoiceId: string) {
 }
 
 export async function deleteInvoice(invoiceId: string) {
-  const inv = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
-  // Issued invoices must never be hard-deleted (GST audit trail) — cancel instead.
+  const { orgId } = await requireOrg("MEMBER");
+  const inv = await prisma.invoice.findFirst({ where: { id: invoiceId, orgId } });
+  if (!inv) throw new Error("Invoice not found");
   if (inv.status !== "DRAFT") throw new Error("Only draft invoices can be deleted. Cancel issued invoices instead.");
   await prisma.invoice.delete({ where: { id: invoiceId } });
   revalidatePath("/invoices");
@@ -226,7 +232,8 @@ export async function deleteInvoice(invoiceId: string) {
 }
 
 export async function updateInvoiceStatus(invoiceId: string, status: InvoiceStatus) {
-  await prisma.invoice.update({ where: { id: invoiceId }, data: { status } });
+  const { orgId } = await requireOrg("MEMBER");
+  await prisma.invoice.updateMany({ where: { id: invoiceId, orgId }, data: { status } });
   revalidatePath(`/invoices/${invoiceId}`);
   revalidatePath("/invoices");
   revalidatePath("/dashboard");
@@ -235,11 +242,12 @@ export async function updateInvoiceStatus(invoiceId: string, status: InvoiceStat
 /** Record a payment and recompute status from the sum of payments vs total. */
 export async function recordPayment(input: PaymentInput) {
   const data = paymentSchema.parse(input);
-  const userId = await currentUserId();
-  const inv = await prisma.invoice.findUniqueOrThrow({
-    where: { id: data.invoiceId },
+  const { userId, orgId } = await requireOrg("MEMBER");
+  const inv = await prisma.invoice.findFirst({
+    where: { id: data.invoiceId, orgId },
     include: { payments: true },
   });
+  if (!inv) throw new Error("Invoice not found");
 
   await prisma.payment.create({
     data: {
@@ -260,6 +268,7 @@ export async function recordPayment(input: PaymentInput) {
   await prisma.invoice.update({ where: { id: inv.id }, data: { status } });
   await prisma.activityLog.create({
     data: {
+      orgId,
       actorId: userId,
       action: "invoice.payment",
       entityType: "Invoice",
@@ -275,29 +284,22 @@ export async function recordPayment(input: PaymentInput) {
 
 /** Convenience: mark fully paid in one click (records the outstanding balance). */
 export async function markInvoicePaid(invoiceId: string) {
-  const inv = await prisma.invoice.findUniqueOrThrow({
-    where: { id: invoiceId },
-    include: { payments: true },
-  });
+  const { orgId } = await requireOrg("MEMBER");
+  const inv = await prisma.invoice.findFirst({ where: { id: invoiceId, orgId }, include: { payments: true } });
+  if (!inv) throw new Error("Invoice not found");
   const paid = inv.payments.reduce((s, p) => s + Number(p.amount), 0);
   const balance = round2(Number(inv.total) - paid);
   if (balance > 0) {
-    await recordPayment({
-      invoiceId,
-      amount: balance,
-      method: "BANK_TRANSFER",
-      paidAt: new Date(),
-    });
+    await recordPayment({ invoiceId, amount: balance, method: "BANK_TRANSFER", paidAt: new Date() });
   } else {
     await updateInvoiceStatus(invoiceId, "PAID");
   }
 }
 
 export async function sendInvoice(invoiceId: string) {
-  const inv = await prisma.invoice.findUniqueOrThrow({
-    where: { id: invoiceId },
-    include: { client: true },
-  });
+  const { orgId } = await requireOrg("MEMBER");
+  const inv = await prisma.invoice.findFirst({ where: { id: invoiceId, orgId }, include: { client: true } });
+  if (!inv) throw new Error("Invoice not found");
   if (inv.client.email) {
     await getMailer().send({
       to: inv.client.email,
@@ -314,7 +316,9 @@ export async function sendInvoice(invoiceId: string) {
 
 /** Create an online payment link via the configured gateway (mock by default). */
 export async function createPaymentLink(invoiceId: string): Promise<string> {
-  const inv = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
+  const { orgId } = await requireOrg("MEMBER");
+  const inv = await prisma.invoice.findFirst({ where: { id: invoiceId, orgId } });
+  if (!inv) throw new Error("Invoice not found");
   const link = await getPaymentGateway().createPaymentLink({
     invoiceId: inv.id,
     amount: Number(inv.total),
@@ -325,8 +329,9 @@ export async function createPaymentLink(invoiceId: string): Promise<string> {
 }
 
 export async function cancelInvoice(invoiceId: string) {
+  const { orgId } = await requireOrg("MEMBER");
   // Soft-cancel to keep the FY number sequence gapless — never hard-delete issued invoices.
-  await prisma.invoice.update({ where: { id: invoiceId }, data: { status: "CANCELLED" } });
+  await prisma.invoice.updateMany({ where: { id: invoiceId, orgId }, data: { status: "CANCELLED" } });
   revalidatePath(`/invoices/${invoiceId}`);
   revalidatePath("/invoices");
   revalidatePath("/dashboard");

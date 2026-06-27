@@ -1,4 +1,38 @@
-import type { SheetData } from "@/components/document-sheet";
+import type { SheetData, SheetBusiness } from "@/components/document-sheet";
+
+type OrgLike = {
+  name: string;
+  legalName?: string | null;
+  gstin?: string | null;
+  address?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  lutNumber?: string | null;
+  bankName?: string | null;
+  bankAccount?: string | null;
+  ifsc?: string | null;
+  swift?: string | null;
+  logoUrl?: string | null;
+};
+
+/** Map an Organization to the document header/business block. */
+export function orgToBusiness(org: OrgLike | null): SheetBusiness | null {
+  if (!org) return null;
+  return {
+    brandName: org.name,
+    legalName: org.legalName ?? org.name,
+    gstin: org.gstin ?? "",
+    address: org.address ?? "",
+    email: org.email ?? "",
+    phone: org.phone ?? null,
+    lutNumber: org.lutNumber ?? null,
+    bankName: org.bankName ?? null,
+    bankAccount: org.bankAccount ?? null,
+    ifsc: org.ifsc ?? null,
+    swift: org.swift ?? null,
+    logoUrl: org.logoUrl ?? null,
+  };
+}
 
 type InvoiceWithRels = {
   number: string;

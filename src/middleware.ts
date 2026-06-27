@@ -1,9 +1,23 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
-// Personal / single-user mode: no authentication gate. Every route is
-// accessible locally. (To re-enable the Google sign-in gate, restore the
-// auth() wrapper from git history.)
-export default function middleware() {
+// Public paths (no session required).
+const PUBLIC = ["/login", "/signup", "/api/auth", "/share", "/api/cron"];
+
+/**
+ * Edge-safe gate: redirects to /login when the Auth.js session cookie is absent.
+ * This is a convenience guard only — the real tenant/permission boundary is
+ * requireOrg() in every page and server action (validated server-side).
+ */
+export default function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+  if (PUBLIC.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
+    return NextResponse.next();
+  }
+  const hasSession =
+    req.cookies.has("authjs.session-token") || req.cookies.has("__Secure-authjs.session-token");
+  if (!hasSession) {
+    return NextResponse.redirect(new URL("/login", req.nextUrl));
+  }
   return NextResponse.next();
 }
 

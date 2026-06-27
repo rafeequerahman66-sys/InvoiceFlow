@@ -1,27 +1,45 @@
 import NextAuth from "next-auth";
+import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
+import { prisma } from "@/lib/db";
+import { verifyPassword } from "@/lib/password";
 
 /**
- * Single-tenant auth: Google sign-in, but only emails on the allowlist may in.
- * Set ALLOWED_EMAILS in .env as a comma-separated list (you + Ismaeel).
+ * Multi-tenant auth. Email/password (Credentials) is the sign-up baseline;
+ * Google is added only if AUTH_GOOGLE_ID is configured. JWT sessions (required
+ * for Credentials). Route protection lives in middleware (cookie presence) +
+ * requireOrg() server-side (the real boundary).
  */
-const allowed = (process.env.ALLOWED_EMAILS ?? "")
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
+const providers = [
+  Credentials({
+    credentials: { email: {}, password: {} },
+    authorize: async (creds) => {
+      const email = String(creds?.email ?? "").trim().toLowerCase();
+      const password = String(creds?.password ?? "");
+      if (!email || !password) return null;
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (!user?.passwordHash) return null;
+      const ok = await verifyPassword(password, user.passwordHash);
+      if (!ok) return null;
+      return { id: user.id, email: user.email, name: user.name };
+    },
+  }),
+];
+
+if (process.env.AUTH_GOOGLE_ID) providers.push(Google as never);
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  providers: [Google],
+  trustHost: true,
+  session: { strategy: "jwt" },
   pages: { signIn: "/login" },
+  providers,
   callbacks: {
-    async signIn({ user }) {
-      const email = user.email?.toLowerCase();
-      if (!email) return false;
-      // If no allowlist is configured, fail closed rather than open.
-      if (allowed.length === 0) return false;
-      return allowed.includes(email);
+    jwt({ token, user }) {
+      if (user?.id) token.uid = user.id;
+      return token;
     },
-    async session({ session }) {
+    session({ session, token }) {
+      if (session.user && token.uid) (session.user as { id?: string }).id = token.uid as string;
       return session;
     },
   },

@@ -9,9 +9,12 @@ import { Card } from "@/components/ui/card";
 import { Badge, statusTone } from "@/components/ui/badge";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { Icon } from "@/components/icon";
+import { requireOrg } from "@/lib/tenant";
 
 export default async function QuotationsPage() {
+  const { orgId } = await requireOrg();
   const quotes = await prisma.quotation.findMany({
+    where: { orgId },
     include: { client: true },
     orderBy: { createdAt: "desc" },
   });

@@ -15,9 +15,11 @@ import {
   topClients,
   type ReportInvoice,
 } from "@/lib/reports";
+import { requireOrg } from "@/lib/tenant";
 
 export default async function ReportsPage() {
-  const invoices = await prisma.invoice.findMany({ include: { client: true } });
+  const { orgId } = await requireOrg();
+  const invoices = await prisma.invoice.findMany({ where: { orgId }, include: { client: true } });
   const rows: ReportInvoice[] = invoices.map((i) => ({
     status: i.status,
     issueDate: i.issueDate,

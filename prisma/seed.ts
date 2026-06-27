@@ -1,34 +1,44 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  await prisma.businessProfile.upsert({
-    where: { id: "rinmedia" },
+  const ownerEmail = (process.env.SEED_OWNER_EMAIL ?? "owner@rinmedia.test").toLowerCase();
+  const ownerPassword = process.env.SEED_OWNER_PASSWORD ?? "password123";
+
+  // Demo tenant.
+  const org = await prisma.organization.upsert({
+    where: { slug: "rin-media" },
+    update: {},
     create: {
-      id: "rinmedia",
-      address: "Bengaluru, Karnataka, India", // update to your registered Kerala address
-      email: "rafeequerahman66@gmail.com",
-      // TODO: drop in the real values from your rin-media-invoice skill
-      lutNumber: null,
+      name: "Rin Media",
+      slug: "rin-media",
+      legalName: "Crew Catalyst Innovations Private Limited",
+      gstin: "32AANCC1730B1ZB",
+      stateCode: "32",
+      address: "Kerala, India",
+      email: ownerEmail,
       bankName: "DCB Bank",
       bankAccount: "XXXXXXXXXXXX",
       ifsc: "XXXX0000000",
-      swift: null,
     },
-    update: {},
   });
 
-  const emails = (process.env.ALLOWED_EMAILS ?? "rafeequerahman66@gmail.com")
-    .split(",").map((e) => e.trim()).filter(Boolean);
-  for (const [i, email] of emails.entries()) {
-    await prisma.user.upsert({
-      where: { email },
-      create: { email, role: i === 0 ? "OWNER" : "MEMBER" },
-      update: {},
-    });
-  }
+  // Owner user + membership.
+  const passwordHash = await bcrypt.hash(ownerPassword, 10);
+  const owner = await prisma.user.upsert({
+    where: { email: ownerEmail },
+    update: {},
+    create: { email: ownerEmail, name: "Rin Media Owner", passwordHash },
+  });
+  await prisma.membership.upsert({
+    where: { userId_orgId: { userId: owner.id, orgId: org.id } },
+    update: {},
+    create: { userId: owner.id, orgId: org.id, role: "OWNER" },
+  });
 
+  // Sample clients (scoped to the org).
   const clients = [
     { name: "Lumen Labs", company: "Lumen Labs Pvt Ltd", email: "ops@lumenlabs.io", country: "IN", stateCode: "32", gstin: "32ABCDE1234F1Z5", defaultCurrency: "INR" },
     { name: "Verda", company: "Verda Capital", email: "finance@verda.fund", country: "IN", stateCode: "27", defaultCurrency: "INR" },
@@ -36,21 +46,22 @@ async function main() {
     { name: "Orbit", company: "Orbit Robotics", email: "team@orbit.dev", country: "DE", defaultCurrency: "EUR" },
   ];
   for (const c of clients) {
-    const exists = await prisma.client.findFirst({ where: { company: c.company } });
-    if (!exists) await prisma.client.create({ data: c });
+    const exists = await prisma.client.findFirst({ where: { orgId: org.id, company: c.company } });
+    if (!exists) await prisma.client.create({ data: { ...c, orgId: org.id } });
   }
 
+  // Sample catalog (scoped to the org).
   const items = [
     { name: "Cinematic brand film (60s)", defaultRate: 180000, sacCode: "998361" },
     { name: "Event coverage — day rate", defaultRate: 65000, sacCode: "998361" },
     { name: "Creative direction — retainer/mo", defaultRate: 120000, sacCode: "998361" },
   ];
   for (const it of items) {
-    const exists = await prisma.catalogItem.findFirst({ where: { name: it.name } });
-    if (!exists) await prisma.catalogItem.create({ data: it });
+    const exists = await prisma.catalogItem.findFirst({ where: { orgId: org.id, name: it.name } });
+    if (!exists) await prisma.catalogItem.create({ data: { ...it, orgId: org.id } });
   }
 
-  console.log("Seeded business profile, users, clients, and catalog.");
+  console.log(`Seeded org "${org.name}". Login: ${ownerEmail} / ${ownerPassword}`);
 }
 
 main().finally(() => prisma.$disconnect());

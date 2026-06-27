@@ -5,15 +5,17 @@ import { AppShell } from "@/components/app-shell";
 import { prisma } from "@/lib/db";
 import { InvoiceForm } from "../../new/invoice-form";
 import type { SupplyType } from "@/lib/tax";
+import { requireOrg } from "@/lib/tenant";
 
 export default async function EditInvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const invoice = await prisma.invoice.findUnique({ where: { id }, include: { items: true } });
+  const { orgId } = await requireOrg("MEMBER");
+  const invoice = await prisma.invoice.findFirst({ where: { id, orgId }, include: { items: true } });
   if (!invoice) notFound();
   if (invoice.status !== "DRAFT") redirect(`/invoices/${id}`);
 
-  const clients = await prisma.client.findMany({ where: { archived: false }, orderBy: { name: "asc" } });
-  const catalog = await prisma.catalogItem.findMany({ where: { archived: false } });
+  const clients = await prisma.client.findMany({ where: { orgId, archived: false }, orderBy: { name: "asc" } });
+  const catalog = await prisma.catalogItem.findMany({ where: { orgId, archived: false } });
 
   return (
     <AppShell title={`Edit ${invoice.number}`} subtitle="Draft invoice" action={null}>

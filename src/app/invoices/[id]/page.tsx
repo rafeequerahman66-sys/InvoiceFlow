@@ -9,11 +9,13 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Badge, statusTone } from "@/components/ui/badge";
 import { DocumentLineTable } from "@/components/document-line-table";
 import { InvoiceActions } from "./invoice-actions";
+import { requireOrg } from "@/lib/tenant";
 
 export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const invoice = await prisma.invoice.findUnique({
-    where: { id },
+  const { orgId } = await requireOrg();
+  const invoice = await prisma.invoice.findFirst({
+    where: { id, orgId },
     include: { items: true, client: true, payments: { orderBy: { paidAt: "desc" } } },
   });
   if (!invoice) notFound();

@@ -8,14 +8,16 @@ import { Table, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { AutomationsRunner } from "./automations-runner";
 import { RecurringForm } from "./recurring-form";
 import { RecurringRowActions } from "./recurring-actions";
+import { requireOrg } from "@/lib/tenant";
 
 const CADENCE_LABEL = (c: string) => c.charAt(0) + c.slice(1).toLowerCase();
 
 export default async function AutomationsPage() {
+  const { orgId } = await requireOrg();
   const [templates, clients, catalog] = await Promise.all([
-    prisma.recurringInvoice.findMany({ include: { client: true, items: true }, orderBy: { createdAt: "desc" } }),
-    prisma.client.findMany({ where: { archived: false }, orderBy: { name: "asc" } }),
-    prisma.catalogItem.findMany({ where: { archived: false } }),
+    prisma.recurringInvoice.findMany({ where: { orgId }, include: { client: true, items: true }, orderBy: { createdAt: "desc" } }),
+    prisma.client.findMany({ where: { orgId, archived: false }, orderBy: { name: "asc" } }),
+    prisma.catalogItem.findMany({ where: { orgId, archived: false } }),
   ]);
 
   return (
