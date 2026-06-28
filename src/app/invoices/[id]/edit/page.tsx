@@ -16,6 +16,10 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
 
   const clients = await prisma.client.findMany({ where: { orgId, archived: false }, orderBy: { name: "asc" } });
   const catalog = await prisma.catalogItem.findMany({ where: { orgId, archived: false } });
+  const bankAccounts = await prisma.bankAccount.findMany({
+    where: { orgId, archived: false },
+    orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+  });
 
   return (
     <AppShell title={`Edit ${invoice.number}`} subtitle="Draft invoice" action={null}>
@@ -30,8 +34,10 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
           currency: c.defaultCurrency,
         }))}
         catalog={catalog.map((p) => ({ id: p.id, name: p.name, rate: Number(p.defaultRate), tax: Number(p.defaultTax) }))}
+        bankAccounts={bankAccounts.map((b) => ({ id: b.id, label: b.label, bankName: b.bankName, isDefault: b.isDefault }))}
         initial={{
           clientId: invoice.clientId,
+          bankAccountId: invoice.bankAccountId,
           currency: invoice.currency,
           issueDate: invoice.issueDate.toISOString().slice(0, 10),
           dueDate: invoice.dueDate.toISOString().slice(0, 10),

@@ -50,7 +50,29 @@ model Organization {
   quotes          Quotation[]
   recurring       RecurringInvoice[]
   numberSequences NumberSequence[]
+  bankAccounts    BankAccount[]
   logs            ActivityLog[]
+}
+
+/// A payee bank account for an org. One is the default; an invoice may pin a specific one.
+model BankAccount {
+  id            String       @id @default(cuid())
+  org           Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  orgId         String
+  label         String // friendly name, e.g. "HDFC Current" or "Wise USD"
+  bankName      String
+  accountName   String?
+  accountNumber String
+  ifsc          String?
+  swift         String?
+  upi           String?
+  branch        String?
+  isDefault     Boolean      @default(false)
+  archived      Boolean      @default(false)
+  invoices      Invoice[]
+  createdAt     DateTime     @default(now())
+
+  @@index([orgId])
 }
 
 model User {
@@ -154,6 +176,8 @@ model Invoice {
   fyLabel        String
   client         Client        @relation(fields: [clientId], references: [id])
   clientId       String
+  bankAccount    BankAccount?  @relation(fields: [bankAccountId], references: [id])
+  bankAccountId  String?
   status         String        @default("DRAFT")
   issueDate      DateTime
   dueDate        DateTime

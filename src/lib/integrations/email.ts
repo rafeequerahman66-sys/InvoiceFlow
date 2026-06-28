@@ -96,6 +96,8 @@ class ResendMailer implements Mailer {
       method: "POST",
       headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ from: this.from, to, subject: subject ?? body.subject, html: body.html, text: body.text }),
+      // Never let a slow/stalled provider hang the request (e.g. signup).
+      signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => "");

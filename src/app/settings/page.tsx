@@ -6,12 +6,17 @@ import { requireOrg, hasRole } from "@/lib/tenant";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { OrgSettingsForm } from "./org-settings-form";
 import { TeamManager } from "./team-manager";
+import { BankAccountsManager } from "./bank-accounts-manager";
 
 export default async function SettingsPage() {
   const ctx = await requireOrg();
-  const [org, members] = await Promise.all([
+  const [org, members, bankAccounts] = await Promise.all([
     prisma.organization.findUnique({ where: { id: ctx.orgId } }),
     prisma.membership.findMany({ where: { orgId: ctx.orgId }, include: { user: true }, orderBy: { createdAt: "asc" } }),
+    prisma.bankAccount.findMany({
+      where: { orgId: ctx.orgId, archived: false },
+      orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+    }),
   ]);
   if (!org) return null;
 
@@ -55,6 +60,27 @@ export default async function SettingsPage() {
                 email: m.user.email,
                 role: m.role,
                 isYou: m.user.email === ctx.userEmail,
+              }))}
+            />
+          </CardBody>
+        </Card>
+
+        <Card className="h-fit lg:col-span-2">
+          <CardHeader>Bank accounts</CardHeader>
+          <CardBody>
+            <BankAccountsManager
+              canManage={canManage}
+              accounts={bankAccounts.map((b) => ({
+                id: b.id,
+                label: b.label,
+                bankName: b.bankName,
+                accountName: b.accountName,
+                accountNumber: b.accountNumber,
+                ifsc: b.ifsc,
+                swift: b.swift,
+                upi: b.upi,
+                branch: b.branch,
+                isDefault: b.isDefault,
               }))}
             />
           </CardBody>

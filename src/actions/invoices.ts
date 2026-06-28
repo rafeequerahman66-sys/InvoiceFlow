@@ -24,6 +24,16 @@ import {
 
 type InvoiceStatus = "DRAFT" | "SENT" | "PARTIALLY_PAID" | "PAID" | "OVERDUE" | "CANCELLED";
 
+/** Pick the bank account to print: the requested one (if it's this org's), else the org default. */
+async function resolveBankAccountId(orgId: string, requested?: string): Promise<string | null> {
+  if (requested) {
+    const a = await prisma.bankAccount.findFirst({ where: { id: requested, orgId, archived: false } });
+    if (a) return a.id;
+  }
+  const def = await prisma.bankAccount.findFirst({ where: { orgId, archived: false, isDefault: true } });
+  return def?.id ?? null;
+}
+
 /** Resolve supply type + computed totals + fx for a payload, scoped to org. */
 async function buildInvoice(orgId: string, data: CreateInvoiceInput) {
   const client = await prisma.client.findFirst({ where: { id: data.clientId, orgId } });
@@ -48,6 +58,7 @@ export async function createInvoice(input: CreateInvoiceInput) {
   const data = createInvoiceSchema.parse(input);
   const { userId, orgId } = await requireOrg("MEMBER");
   const { client, supplyType, totals, fxRate, totalInr, placeOfSupply } = await buildInvoice(orgId, data);
+  const bankAccountId = await resolveBankAccountId(orgId, data.bankAccountId);
 
   const invoice = await prisma.$transaction(async (tx) => {
     const { number, fyLabel } = await nextNumber(tx, orgId, "INVOICE", "INV", data.issueDate);
@@ -57,6 +68,7 @@ export async function createInvoice(input: CreateInvoiceInput) {
         number,
         fyLabel,
         clientId: client.id,
+        bankAccountId,
         status: "DRAFT",
         issueDate: data.issueDate,
         dueDate: data.dueDate,
@@ -118,6 +130,7 @@ export async function updateInvoice(invoiceId: string, input: CreateInvoiceInput
   if (!existing) throw new Error("Invoice not found");
   if (existing.status !== "DRAFT") throw new Error("Only draft invoices can be edited");
   const { supplyType, totals, fxRate, totalInr, placeOfSupply } = await buildInvoice(orgId, data);
+  const bankAccountId = await resolveBankAccountId(orgId, data.bankAccountId);
 
   await prisma.$transaction(async (tx) => {
     await tx.invoiceItem.deleteMany({ where: { invoiceId } });
@@ -125,6 +138,7 @@ export async function updateInvoice(invoiceId: string, input: CreateInvoiceInput
       where: { id: invoiceId },
       data: {
         clientId: data.clientId,
+        bankAccountId,
         issueDate: data.issueDate,
         dueDate: data.dueDate,
         currency: data.currency,

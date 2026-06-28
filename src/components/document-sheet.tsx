@@ -10,9 +10,12 @@ export type SheetBusiness = {
   phone?: string | null;
   lutNumber?: string | null;
   bankName?: string | null;
+  accountName?: string | null;
   bankAccount?: string | null;
   ifsc?: string | null;
   swift?: string | null;
+  upi?: string | null;
+  branch?: string | null;
   logoUrl?: string | null;
 };
 
@@ -222,9 +225,12 @@ export function DocumentSheet({
             Payment details
           </div>
           {business?.bankName && <div>Bank: {business.bankName}</div>}
+          {business?.accountName && <div>Name: {business.accountName}</div>}
           {business?.bankAccount && <div>A/C: {business.bankAccount}</div>}
           {business?.ifsc && <div>IFSC: {business.ifsc}</div>}
+          {business?.branch && <div>Branch: {business.branch}</div>}
           {business?.swift && <div>SWIFT: {business.swift}</div>}
+          {business?.upi && <div>UPI: {business.upi}</div>}
           {data.notes && <div className="mt-2 whitespace-pre-wrap">{data.notes}</div>}
           {data.terms && <div className="mt-2 whitespace-pre-wrap">Terms: {data.terms}</div>}
         </div>

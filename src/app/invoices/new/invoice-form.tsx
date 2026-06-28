@@ -12,9 +12,11 @@ import { LineItemsEditor, emptyLine, type Line, type CatalogOpt } from "@/compon
 import { TotalsPanel } from "@/components/totals-panel";
 
 type ClientOpt = { id: string; label: string; country: string; stateCode: string | null; currency: string };
+type BankOpt = { id: string; label: string; bankName: string; isDefault: boolean };
 
 export type InvoiceFormInitial = {
   clientId: string;
+  bankAccountId?: string | null;
   currency: string;
   issueDate: string;
   dueDate: string;
@@ -36,18 +38,22 @@ const SUPPLY_LABELS: Record<SupplyType, string> = {
 export function InvoiceForm({
   clients,
   catalog,
+  bankAccounts = [],
   mode = "create",
   invoiceId,
   initial,
 }: {
   clients: ClientOpt[];
   catalog: CatalogOpt[];
+  bankAccounts?: BankOpt[];
   mode?: "create" | "edit";
   invoiceId?: string;
   initial?: InvoiceFormInitial;
 }) {
   const today = new Date().toISOString().slice(0, 10);
+  const defaultBank = bankAccounts.find((b) => b.isDefault) ?? bankAccounts[0];
   const [clientId, setClientId] = useState(initial?.clientId ?? clients[0]?.id ?? "");
+  const [bankAccountId, setBankAccountId] = useState(initial?.bankAccountId ?? defaultBank?.id ?? "");
   const [currency, setCurrency] = useState(initial?.currency ?? clients[0]?.currency ?? "INR");
   const [issueDate, setIssueDate] = useState(initial?.issueDate ?? today);
   const [dueDate, setDueDate] = useState(initial?.dueDate ?? today);
@@ -73,6 +79,7 @@ export function InvoiceForm({
     setBusy(true);
     const payload = {
       clientId,
+      bankAccountId: bankAccountId || undefined,
       issueDate: new Date(issueDate),
       dueDate: new Date(dueDate),
       currency,
@@ -150,6 +157,24 @@ export function InvoiceForm({
             ))}
           </select>
         </div>
+
+        {bankAccounts.length > 0 && (
+          <div>
+            <Label>Bank account (shown on invoice)</Label>
+            <select
+              className={fieldClasses("w-full")}
+              value={bankAccountId}
+              onChange={(e) => setBankAccountId(e.target.value)}
+            >
+              {bankAccounts.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.label} · {b.bankName}
+                  {b.isDefault ? " (default)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <LineItemsEditor items={items} setItems={setItems} catalog={catalog} />
 

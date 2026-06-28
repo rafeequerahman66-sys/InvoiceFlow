@@ -12,6 +12,7 @@ export const lineItemSchema = z.object({
 
 export const createInvoiceSchema = z.object({
   clientId: z.string().min(1, "Pick a client"),
+  bankAccountId: z.string().optional(),
   issueDate: z.coerce.date(),
   dueDate: z.coerce.date(),
   currency: z.string().default("INR"),
@@ -97,3 +98,17 @@ export const clientSchema = z.object({
 });
 
 export type ClientInput = z.infer<typeof clientSchema>;
+
+export const bankAccountSchema = z.object({
+  label: z.string().min(1, "Label required"),
+  bankName: z.string().min(1, "Bank name required"),
+  accountName: z.string().optional(),
+  accountNumber: z.string().min(1, "Account number required"),
+  ifsc: z.string().optional(),
+  swift: z.string().optional(),
+  upi: z.string().optional(),
+  branch: z.string().optional(),
+  isDefault: z.coerce.boolean().default(false),
+});
+
+export type BankAccountInput = z.infer<typeof bankAccountSchema>;

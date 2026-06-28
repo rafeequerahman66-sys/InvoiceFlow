@@ -12,7 +12,7 @@ export default async function InvoicePrintPage({ params }: { params: Promise<{ i
   const { orgId } = await requireOrg();
   const invoice = await prisma.invoice.findFirst({
     where: { id, orgId },
-    include: { items: true, client: true, org: true },
+    include: { items: true, client: true, org: true, bankAccount: true },
   });
   if (!invoice) notFound();
 
@@ -21,7 +21,7 @@ export default async function InvoicePrintPage({ params }: { params: Promise<{ i
       <PrintBar downloadName={`${invoice.number.replace(/\//g, "-")}.pdf`} />
       <DocumentSheet
         data={invoiceToSheet(invoice)}
-        business={orgToBusiness(invoice.org)}
+        business={orgToBusiness(invoice.org, invoice.bankAccount)}
         watermark={invoice.status === "PAID" ? "PAID" : undefined}
       />
     </div>

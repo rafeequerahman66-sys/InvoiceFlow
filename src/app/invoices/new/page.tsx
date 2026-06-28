@@ -10,6 +10,10 @@ export default async function NewInvoicePage() {
   const { orgId } = await requireOrg("MEMBER");
   const clients = await prisma.client.findMany({ where: { orgId, archived: false }, orderBy: { name: "asc" } });
   const catalog = await prisma.catalogItem.findMany({ where: { orgId, archived: false } });
+  const bankAccounts = await prisma.bankAccount.findMany({
+    where: { orgId, archived: false },
+    orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+  });
   return (
     <AppShell title="Create Invoice" subtitle="New tax invoice" action={null}>
       <Link href="/invoices" className="mb-4 inline-block text-[12px] text-[var(--text-dim)] hover:text-[var(--text)]">
@@ -24,6 +28,7 @@ export default async function NewInvoicePage() {
           currency: c.defaultCurrency,
         }))}
         catalog={catalog.map((p) => ({ id: p.id, name: p.name, rate: Number(p.defaultRate), tax: Number(p.defaultTax) }))}
+        bankAccounts={bankAccounts.map((b) => ({ id: b.id, label: b.label, bankName: b.bankName, isDefault: b.isDefault }))}
       />
     </AppShell>
   );

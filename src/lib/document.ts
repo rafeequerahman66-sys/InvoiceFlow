@@ -15,8 +15,22 @@ type OrgLike = {
   logoUrl?: string | null;
 };
 
-/** Map an Organization to the document header/business block. */
-export function orgToBusiness(org: OrgLike | null): SheetBusiness | null {
+type BankLike = {
+  bankName: string;
+  accountName?: string | null;
+  accountNumber: string;
+  ifsc?: string | null;
+  swift?: string | null;
+  upi?: string | null;
+  branch?: string | null;
+};
+
+/**
+ * Map an Organization to the document header/business block.
+ * If a bank account is supplied (the one pinned on the invoice, or the org default),
+ * its details override the org's legacy single-bank fields.
+ */
+export function orgToBusiness(org: OrgLike | null, bank?: BankLike | null): SheetBusiness | null {
   if (!org) return null;
   return {
     brandName: org.name,
@@ -26,10 +40,13 @@ export function orgToBusiness(org: OrgLike | null): SheetBusiness | null {
     email: org.email ?? "",
     phone: org.phone ?? null,
     lutNumber: org.lutNumber ?? null,
-    bankName: org.bankName ?? null,
-    bankAccount: org.bankAccount ?? null,
-    ifsc: org.ifsc ?? null,
-    swift: org.swift ?? null,
+    bankName: bank?.bankName ?? org.bankName ?? null,
+    accountName: bank?.accountName ?? null,
+    bankAccount: bank?.accountNumber ?? org.bankAccount ?? null,
+    ifsc: bank?.ifsc ?? org.ifsc ?? null,
+    swift: bank?.swift ?? org.swift ?? null,
+    upi: bank?.upi ?? null,
+    branch: bank?.branch ?? null,
     logoUrl: org.logoUrl ?? null,
   };
 }
