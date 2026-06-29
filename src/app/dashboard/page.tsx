@@ -13,16 +13,54 @@ import { requireOrg } from "@/lib/tenant";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+// Only the columns needed for KPI computation and charts
+const INV_SELECT = {
+  status: true,
+  totalInr: true,
+  issueDate: true,
+  dueDate: true,
+} as const;
+
+const RECENT_SELECT = {
+  id: true,
+  number: true,
+  total: true,
+  currency: true,
+  status: true,
+  issueDate: true,
+  client: { select: { name: true, company: true } },
+} as const;
+
+const QUOTE_SELECT = {
+  id: true,
+  number: true,
+  total: true,
+  currency: true,
+  status: true,
+  client: { select: { name: true, company: true } },
+} as const;
+
 export default async function DashboardPage() {
   const { orgId, orgName, userName } = await requireOrg();
+
+  const todayStr = new Date().toISOString().slice(0, 10);
   const [recent, all, recentQuotes] = await Promise.all([
-    prisma.invoice.findMany({ where: { orgId }, include: { client: true }, orderBy: { issueDate: "desc" }, take: 6 }),
-    prisma.invoice.findMany({ where: { orgId } }),
-    prisma.quotation.findMany({ where: { orgId }, include: { client: true }, orderBy: { createdAt: "desc" }, take: 5 }),
+    prisma.invoice.findMany({
+      where: { orgId },
+      select: RECENT_SELECT,
+      orderBy: { issueDate: "desc" },
+      take: 6,
+    }),
+    prisma.invoice.findMany({ where: { orgId }, select: INV_SELECT }),
+    prisma.quotation.findMany({
+      where: { orgId },
+      select: QUOTE_SELECT,
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    }),
   ]);
 
   let revenue = 0, pending = 0, overdue = 0, paidCount = 0, pendingCount = 0, overdueCount = 0;
-  const todayStr = new Date().toISOString().slice(0, 10);
 
   const now = new Date();
   const buckets: { key: string; point: MonthPoint }[] = [];

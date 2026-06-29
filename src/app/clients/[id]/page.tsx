@@ -18,8 +18,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const client = await prisma.client.findFirst({
     where: { id, orgId },
     include: {
-      invoices: { orderBy: { createdAt: "desc" } },
-      quotes: { orderBy: { createdAt: "desc" } },
+      invoices: { orderBy: { createdAt: "desc" }, take: 100 },
+      quotes: { orderBy: { createdAt: "desc" }, take: 100 },
     },
   });
   if (!client) notFound();

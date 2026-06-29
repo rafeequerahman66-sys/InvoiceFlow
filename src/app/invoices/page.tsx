@@ -21,27 +21,45 @@ export default async function InvoicesPage({
   const { orgId } = await requireOrg();
   const { q, status } = await searchParams;
 
-  const invoices = await prisma.invoice.findMany({
-    where: {
-      orgId,
-      ...(status && status !== "ALL" ? { status } : {}),
-    },
-    include: { client: true },
-    orderBy: { createdAt: "desc" },
-  });
+  const where = {
+    orgId,
+    ...(status && status !== "ALL" ? { status } : {}),
+    ...(q
+      ? {
+          OR: [
+            { number: { contains: q } },
+            { client: { name: { contains: q } } },
+            { client: { company: { contains: q } } },
+          ],
+        }
+      : {}),
+  };
 
-  const filtered = q
-    ? invoices.filter(
-        (inv) =>
-          inv.number.toLowerCase().includes(q.toLowerCase()) ||
-          (inv.client.company ?? inv.client.name).toLowerCase().includes(q.toLowerCase())
-      )
-    : invoices;
+  const [invoices, total] = await Promise.all([
+    prisma.invoice.findMany({
+      where,
+      select: {
+        id: true,
+        number: true,
+        total: true,
+        currency: true,
+        status: true,
+        issueDate: true,
+        client: { select: { name: true, company: true } },
+      },
+      orderBy: { issueDate: "desc" },
+      take: 100,
+    }),
+    q || (status && status !== "ALL") ? prisma.invoice.count({ where: { orgId } }) : Promise.resolve(0),
+  ]);
+
+  const filtered = invoices;
+  const allCount = q || (status && status !== "ALL") ? (total as number) : invoices.length;
 
   return (
     <AppShell
       title="Invoices"
-      subtitle={`${filtered.length} of ${invoices.length}`}
+      subtitle={`${filtered.length}${allCount > filtered.length ? ` of ${allCount}` : ""} invoices`}
       action={
         <ButtonLink href="/invoices/new" className="gap-1.5">
           <Icon name="plus" size={16} className="text-[var(--accent-ink)]" /> New Invoice

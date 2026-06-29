@@ -253,6 +253,7 @@ model Invoice {
   @@unique([orgId, number])
   @@index([orgId, status])
   @@index([orgId, issueDate])
+  @@index([orgId, clientId])
 }
 
 model InvoiceItem {
@@ -301,6 +302,7 @@ model Quotation {
 
   @@unique([orgId, number])
   @@index([orgId, status])
+  @@index([orgId, clientId])
 }
 
 model QuoteItem {
@@ -345,6 +347,8 @@ model ActivityLog {
 
   @@index([orgId])
   @@index([entityType, entityId])
+  @@index([orgId, action, createdAt])
+  @@index([entityId, action, createdAt])
 }
 
 /// Template that auto-generates invoices on a cadence (retainers).

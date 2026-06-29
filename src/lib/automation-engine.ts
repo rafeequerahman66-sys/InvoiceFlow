@@ -117,65 +117,109 @@ export async function sendDueRemindersForOrg(orgId: string, userId: string | nul
   const today = now.toISOString().slice(0, 10);
   const soon = new Date(now.getTime() + 3 * DAY);
   const startOfToday = new Date(today + "T00:00:00.000Z");
-  const open = await prisma.invoice.findMany({
-    where: { orgId, status: { in: ["SENT", "PARTIALLY_PAID", "OVERDUE"] } },
-    include: { client: true },
-  });
+
+  // Batch: fetch open invoices + already-sent reminders today in one parallel shot
+  const [open, sentToday] = await Promise.all([
+    prisma.invoice.findMany({
+      where: { orgId, status: { in: ["SENT", "PARTIALLY_PAID", "OVERDUE"] } },
+      select: {
+        id: true,
+        number: true,
+        status: true,
+        dueDate: true,
+        client: { select: { email: true, name: true } },
+      },
+    }),
+    prisma.activityLog.findMany({
+      where: { orgId, action: "invoice.reminder", createdAt: { gte: startOfToday } },
+      select: { entityId: true },
+    }),
+  ]);
+
+  // O(1) lookup — no per-invoice DB hit
+  const alreadySent = new Set(sentToday.map((l) => l.entityId));
+
   const mailer = getMailer();
   let remindersSent = 0;
   let overdueMarked = 0;
 
+  // Collect status updates + new logs to batch
+  const overdueIds: string[] = [];
+  const newLogs: { invoiceId: string; number: string; kind: "overdue" | "due_soon" }[] = [];
+  const emailJobs: { email: string; template: "PAYMENT_REMINDER" | "DUE_REMINDER"; number: string; name: string }[] = [];
+
   for (const inv of open) {
     const isOverdue = inv.dueDate.toISOString().slice(0, 10) < today;
     const dueSoon = !isOverdue && inv.dueDate <= soon;
-    if (isOverdue && inv.status !== "OVERDUE") {
-      await prisma.invoice.update({ where: { id: inv.id }, data: { status: "OVERDUE" } });
-      overdueMarked++;
-    }
+
+    if (isOverdue && inv.status !== "OVERDUE") overdueIds.push(inv.id);
     if (!isOverdue && !dueSoon) continue;
-    const already = await prisma.activityLog.count({
-      where: { entityId: inv.id, action: "invoice.reminder", createdAt: { gte: startOfToday } },
-    });
-    if (already > 0) continue;
+    if (alreadySent.has(inv.id)) continue;
+
     if (inv.client.email) {
-      await mailer.send({
-        to: inv.client.email,
+      emailJobs.push({
+        email: inv.client.email,
         template: isOverdue ? "PAYMENT_REMINDER" : "DUE_REMINDER",
-        data: { number: inv.number, clientName: inv.client.name },
+        number: inv.number,
+        name: inv.client.name,
       });
     }
-    await prisma.activityLog.create({
-      data: {
-        orgId,
-        actorId: userId,
-        action: "invoice.reminder",
-        entityType: "Invoice",
-        entityId: inv.id,
-        meta: JSON.stringify({ kind: isOverdue ? "overdue" : "due_soon", number: inv.number }),
-      },
-    });
-    remindersSent++;
+    newLogs.push({ invoiceId: inv.id, number: inv.number, kind: isOverdue ? "overdue" : "due_soon" });
   }
+
+  // Flush all DB writes + emails in parallel
+  await Promise.all([
+    overdueIds.length
+      ? prisma.invoice.updateMany({ where: { id: { in: overdueIds } }, data: { status: "OVERDUE" } })
+      : Promise.resolve(),
+    newLogs.length
+      ? prisma.activityLog.createMany({
+          data: newLogs.map((l) => ({
+            orgId,
+            actorId: userId,
+            action: "invoice.reminder",
+            entityType: "Invoice",
+            entityId: l.invoiceId,
+            meta: JSON.stringify({ kind: l.kind, number: l.number }),
+          })),
+        })
+      : Promise.resolve(),
+    ...emailJobs.map((j) =>
+      mailer.send({ to: j.email, template: j.template, data: { number: j.number, clientName: j.name } })
+    ),
+  ]);
+
+  overdueMarked = overdueIds.length;
+  remindersSent = newLogs.length;
   return { remindersSent, overdueMarked };
 }
 
 export type AutomationSummary = { invoicesCreated: number } & ReminderResult;
 
-/** Cron entry: run automations for every org, using each org's owner as actor. */
+/** Cron entry: run automations for every org concurrently (owner as actor). */
 export async function runAllOrgs(now: Date = new Date()): Promise<AutomationSummary> {
   const orgs = await prisma.organization.findMany({
-    include: { memberships: { where: { role: "OWNER" }, take: 1 } },
+    select: { id: true, memberships: { where: { role: "OWNER" }, select: { userId: true }, take: 1 } },
   });
-  let invoicesCreated = 0;
-  let remindersSent = 0;
-  let overdueMarked = 0;
-  for (const org of orgs) {
-    const ownerId = org.memberships[0]?.userId;
-    if (!ownerId) continue;
-    invoicesCreated += await generateDueForOrg(org.id, ownerId, now);
-    const r = await sendDueRemindersForOrg(org.id, ownerId, now);
-    remindersSent += r.remindersSent;
-    overdueMarked += r.overdueMarked;
-  }
-  return { invoicesCreated, remindersSent, overdueMarked };
+
+  const results = await Promise.all(
+    orgs.map(async (org) => {
+      const ownerId = org.memberships[0]?.userId;
+      if (!ownerId) return { invoicesCreated: 0, remindersSent: 0, overdueMarked: 0 };
+      const [invoicesCreated, reminder] = await Promise.all([
+        generateDueForOrg(org.id, ownerId, now),
+        sendDueRemindersForOrg(org.id, ownerId, now),
+      ]);
+      return { invoicesCreated, ...reminder };
+    })
+  );
+
+  return results.reduce(
+    (acc, r) => ({
+      invoicesCreated: acc.invoicesCreated + r.invoicesCreated,
+      remindersSent: acc.remindersSent + r.remindersSent,
+      overdueMarked: acc.overdueMarked + r.overdueMarked,
+    }),
+    { invoicesCreated: 0, remindersSent: 0, overdueMarked: 0 }
+  );
 }

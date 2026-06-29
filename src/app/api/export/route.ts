@@ -29,7 +29,11 @@ export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get("type") ?? "invoices";
 
   if (type === "gst") {
-    const invoices = await prisma.invoice.findMany({ where: { orgId }, orderBy: { issueDate: "asc" } });
+    const invoices = await prisma.invoice.findMany({
+      where: { orgId },
+      select: { status: true, issueDate: true, fyLabel: true, taxableValue: true, cgst: true, sgst: true, igst: true, totalInr: true },
+      orderBy: { issueDate: "asc" },
+    });
     const rows: ReportInvoice[] = invoices.map((i) => ({
       status: i.status,
       issueDate: i.issueDate,
@@ -52,7 +56,11 @@ export async function GET(req: NextRequest) {
   // Default: invoices export
   const invoices = await prisma.invoice.findMany({
     where: { orgId },
-    include: { client: true },
+    select: {
+      number: true, status: true, issueDate: true, dueDate: true, currency: true, supplyType: true,
+      taxableValue: true, cgst: true, sgst: true, igst: true, total: true, totalInr: true,
+      client: { select: { name: true, company: true } },
+    },
     orderBy: { issueDate: "desc" },
   });
   const csv = toCsv([

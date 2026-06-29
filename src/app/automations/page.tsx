@@ -15,9 +15,20 @@ const CADENCE_LABEL = (c: string) => c.charAt(0) + c.slice(1).toLowerCase();
 export default async function AutomationsPage() {
   const { orgId } = await requireOrg();
   const [templates, clients, catalog] = await Promise.all([
-    prisma.recurringInvoice.findMany({ where: { orgId }, include: { client: true, items: true }, orderBy: { createdAt: "desc" } }),
-    prisma.client.findMany({ where: { orgId, archived: false }, orderBy: { name: "asc" } }),
-    prisma.catalogItem.findMany({ where: { orgId, archived: false } }),
+    prisma.recurringInvoice.findMany({
+      where: { orgId },
+      select: { id: true, title: true, cadence: true, nextRunDate: true, active: true, client: { select: { name: true, company: true } }, items: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.client.findMany({
+      where: { orgId, archived: false },
+      select: { id: true, name: true, company: true, country: true, stateCode: true, defaultCurrency: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.catalogItem.findMany({
+      where: { orgId, archived: false },
+      select: { id: true, name: true, defaultRate: true, defaultTax: true },
+    }),
   ]);
 
   return (

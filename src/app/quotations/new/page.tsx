@@ -8,8 +8,17 @@ import { requireOrg } from "@/lib/tenant";
 
 export default async function NewQuotePage() {
   const { orgId } = await requireOrg("MEMBER");
-  const clients = await prisma.client.findMany({ where: { orgId, archived: false }, orderBy: { name: "asc" } });
-  const catalog = await prisma.catalogItem.findMany({ where: { orgId, archived: false } });
+  const [clients, catalog] = await Promise.all([
+    prisma.client.findMany({
+      where: { orgId, archived: false },
+      select: { id: true, name: true, company: true, country: true, stateCode: true, defaultCurrency: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.catalogItem.findMany({
+      where: { orgId, archived: false },
+      select: { id: true, name: true, defaultRate: true, defaultTax: true },
+    }),
+  ]);
   return (
     <AppShell title="Create Quotation" subtitle="New estimate" action={null}>
       <Link href="/quotations" className="mb-4 inline-block text-[12px] text-[var(--text-dim)] hover:text-[var(--text)]">

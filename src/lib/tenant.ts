@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
@@ -21,20 +22,34 @@ export function hasRole(role: Role, min: Role): boolean {
   return RANK[role] >= RANK[min];
 }
 
+// Minimal select — avoids pulling passwordHash, tokens, full org rows, etc.
+const USER_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  memberships: {
+    select: {
+      id: true,
+      orgId: true,
+      role: true,
+      createdAt: true,
+      org: { select: { id: true, name: true } },
+    },
+    orderBy: { createdAt: "asc" as const },
+  },
+} as const;
+
 /**
  * Resolve the signed-in user + their active organization. Redirects to /login
  * if unauthenticated, and to /dashboard if the role is below `minRole`.
- * This is the real tenant boundary — every page/action calls it.
+ * Memoized with React cache() so multiple calls in one render hit the DB once.
  */
-export async function requireOrg(minRole: Role = "VIEWER"): Promise<OrgContext> {
+export const requireOrg = cache(async (minRole: Role = "VIEWER"): Promise<OrgContext> => {
   const session = await auth();
   const email = session?.user?.email?.toLowerCase();
   if (!email) redirect("/login");
 
-  const user = await prisma.user.findUnique({
-    where: { email },
-    include: { memberships: { include: { org: true }, orderBy: { createdAt: "asc" } } },
-  });
+  const user = await prisma.user.findUnique({ where: { email }, select: USER_SELECT });
   if (!user || user.memberships.length === 0) redirect("/login");
 
   const store = await cookies();
@@ -51,16 +66,13 @@ export async function requireOrg(minRole: Role = "VIEWER"): Promise<OrgContext> 
     orgName: membership.org.name,
     role,
   };
-}
+});
 
 /** All orgs the signed-in user belongs to (for the org switcher). Empty if none. */
 export async function getUserOrgs(): Promise<{ id: string; name: string; role: Role }[]> {
   const session = await auth();
   const email = session?.user?.email?.toLowerCase();
   if (!email) return [];
-  const user = await prisma.user.findUnique({
-    where: { email },
-    include: { memberships: { include: { org: true }, orderBy: { createdAt: "asc" } } },
-  });
+  const user = await prisma.user.findUnique({ where: { email }, select: USER_SELECT });
   return (user?.memberships ?? []).map((m) => ({ id: m.orgId, name: m.org.name, role: m.role as Role }));
 }
