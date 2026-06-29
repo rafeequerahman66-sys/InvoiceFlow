@@ -51,20 +51,40 @@ Return ONLY valid JSON in exactly this shape:
 }
 
 Extraction rules:
-- contactName: the primary contact person's full name. Never a company name.
-- company: the legal business name (e.g. "Zo World Pvt Ltd"). Ignore marketing names unless clearly the company.
-- email: the billing/business email; prefer finance@/accounts@/hello@ over personal emails unless only a personal one exists.
-- phone: international format where possible (e.g. "+91 9876543210").
-- billingAddress: the complete address as one string (building, street, area, city, state, postal code, country). Preserve formatting.
-- country: derive from the address (e.g. India, United States, United Kingdom, Singapore, UAE, Australia, Canada, Germany). null if unknown.
-- state: the state/province (e.g. Karnataka, Kerala, California, Dubai, Ontario).
-- currency: infer from country — India→INR, United States→USD, United Kingdom→GBP, EU→EUR, Singapore→SGD, UAE→AED, Australia→AUD, Canada→CAD, Japan→JPY. null if uncertain.
-- gstin: Indian GST number (15 chars). Only return if explicitly present. Never guess.
-- taxId: other tax registration (VAT/EIN/TIN/ABN). Only the value.
-- notes: useful billing instructions that don't fit other fields (e.g. "Payment terms: Net 30", "PO required").
-- confidence: 0-100 per field. 100=explicitly stated, 90=very likely, 70=inferred, 40=weak guess, 0=missing.
 
-Rules: Never invent information. Never hallucinate company names. Never guess GST numbers. Missing => null. Ignore greetings/signatures unless they contain useful contact info. If multiple companies appear, choose the one clearly being billed. Preserve capitalization, GSTIN/Tax IDs, emails, and phone numbers exactly. Trim spaces. Output ONLY valid JSON — no Markdown, no code fences, no explanations.`;
+contactName: Extract the primary contact person's full name. Examples: John Smith, Alex Johnson. Do NOT return company names here.
+
+company: Extract the legal business name. Examples: Zo World Pvt Ltd, Monad Labs Inc., Together Advisors LLP. Ignore marketing names unless they are clearly the company name.
+
+email: Extract the billing or business email. Prefer finance@, accounts@, hello@ over personal emails unless only a personal one is available.
+
+phone: Extract phone numbers in international format whenever possible. Examples: +91 9876543210, +1 202-555-0123.
+
+billingAddress: Combine the complete billing address into one string. Include building, street, area, city, state, postal code, country. Preserve formatting where possible.
+
+country: Determine the country from the address. Examples: India, United States, United Kingdom, Singapore, UAE, Australia. If unavailable, return null.
+
+state: Extract the state or province. Examples: Karnataka, Kerala, California, Dubai, Ontario.
+
+currency: Automatically infer from the detected country. India→INR, United States→USD, United Kingdom→GBP, EU→EUR, Singapore→SGD, UAE→AED, Australia→AUD, Canada→CAD, Japan→JPY. If uncertain, return null.
+
+gstin: Indian GST number (15 chars). Only return if explicitly present. Never guess.
+
+taxId: Other tax registration (VAT/EIN/TIN/ABN). Only the value, exactly as written.
+
+notes: Useful billing instructions that don't belong in another field. Examples: "Send invoices to finance department.", "Purchase order required.", "Payment terms: Net 30".
+
+confidence: 0–100 per field. 100=explicitly stated, 90=very likely, 70=inferred, 40=weak guess, 0=missing.
+
+Rules:
+- Never invent information. Never hallucinate company names. Never guess GST numbers.
+- Missing information must be null, not an empty string.
+- Ignore greetings and signatures unless they contain useful contact information.
+- Ignore unrelated conversation.
+- If multiple companies appear, choose the one that is clearly the client being billed.
+- Preserve capitalization, GSTIN/Tax IDs, emails, and phone numbers exactly.
+- Trim unnecessary spaces.
+- Output ONLY valid JSON — no Markdown, no code fences, no explanations.`;
 
 function parseJsonLoose(text: string): RawExtraction | null {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
