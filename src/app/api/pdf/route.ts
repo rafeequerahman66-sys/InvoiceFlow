@@ -21,10 +21,11 @@ export async function GET(req: NextRequest) {
 
   const invoice = await prisma.invoice.findFirst({
     where: { id, orgId },
-    include: { items: true, client: true, org: true },
+    include: { items: true, client: true, org: true, bankAccount: true },
   });
   if (!invoice) return new NextResponse("Not found", { status: 404 });
   const profile = invoice.org;
+  const bank = invoice.bankAccount;
 
   try {
     // Imported lazily so a load failure can't crash unrelated routes.
@@ -40,9 +41,15 @@ export async function GET(req: NextRequest) {
               gstin: profile.gstin ?? "",
               address: profile.address ?? "",
               email: profile.email ?? "",
-              bankName: profile.bankName,
-              bankAccount: profile.bankAccount,
-              ifsc: profile.ifsc,
+              phone: profile.phone,
+              // Prefer the bank account pinned on the invoice; fall back to the
+              // org's legacy single-bank fields.
+              bankName: bank?.bankName ?? profile.bankName,
+              accountName: bank?.accountName ?? null,
+              bankAccount: bank?.accountNumber ?? profile.bankAccount,
+              ifsc: bank?.ifsc ?? profile.ifsc,
+              branch: bank?.branch ?? null,
+              upi: bank?.upi ?? null,
             }
           : null,
         invoice: {
@@ -52,24 +59,31 @@ export async function GET(req: NextRequest) {
           currency: invoice.currency,
           supplyType: invoice.supplyType,
           placeOfSupply: invoice.placeOfSupply,
+          taxableValue: toNum(invoice.taxableValue),
           subtotal: toNum(invoice.subtotal),
           cgst: toNum(invoice.cgst),
           sgst: toNum(invoice.sgst),
           igst: toNum(invoice.igst),
           total: toNum(invoice.total),
           notes: invoice.notes,
+          terms: invoice.terms,
           lutDeclaration: invoice.lutDeclaration,
           client: {
             name: invoice.client.name,
             company: invoice.client.company,
             gstin: invoice.client.gstin,
             billingAddress: invoice.client.billingAddress,
+            phone: invoice.client.phone,
+            country: invoice.client.country,
           },
           items: invoice.items.map((it) => ({
             name: it.name,
+            description: it.description,
+            sacCode: it.sacCode,
             qty: toNum(it.qty),
             rate: toNum(it.rate),
             taxRate: toNum(it.taxRate),
+            lineTax: toNum(it.lineTax),
             lineTotal: toNum(it.lineTotal),
           })),
         },
