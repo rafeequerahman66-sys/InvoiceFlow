@@ -34,7 +34,7 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
           currency: c.defaultCurrency,
         }))}
         catalog={catalog.map((p) => ({ id: p.id, name: p.name, rate: Number(p.defaultRate), tax: Number(p.defaultTax) }))}
-        bankAccounts={bankAccounts.map((b) => ({ id: b.id, label: b.label, bankName: b.bankName, isDefault: b.isDefault }))}
+        bankAccounts={bankAccounts.map((b) => ({ id: b.id, label: b.label, bankName: b.bankName, accountNumber: b.accountNumber, ifsc: b.ifsc, upi: b.upi, isDefault: b.isDefault }))}
         initial={{
           clientId: invoice.clientId,
           bankAccountId: invoice.bankAccountId,

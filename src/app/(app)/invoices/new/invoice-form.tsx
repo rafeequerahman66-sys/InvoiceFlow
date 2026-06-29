@@ -12,7 +12,15 @@ import { LineItemsEditor, emptyLine, type Line, type CatalogOpt } from "@/compon
 import { TotalsPanel } from "@/components/totals-panel";
 
 type ClientOpt = { id: string; label: string; country: string; stateCode: string | null; currency: string };
-type BankOpt = { id: string; label: string; bankName: string; isDefault: boolean };
+type BankOpt = {
+  id: string;
+  label: string;
+  bankName: string;
+  accountNumber: string;
+  ifsc: string | null;
+  upi: string | null;
+  isDefault: boolean;
+};
 
 export type InvoiceFormInitial = {
   clientId: string;
@@ -158,23 +166,79 @@ export function InvoiceForm({
           </select>
         </div>
 
-        {bankAccounts.length > 0 && (
-          <div>
+        <div>
+          <div className="mb-2 flex items-center justify-between">
             <Label>Bank account (shown on invoice)</Label>
-            <select
-              className={fieldClasses("w-full")}
-              value={bankAccountId}
-              onChange={(e) => setBankAccountId(e.target.value)}
+            <a
+              href="/banking/bank-accounts"
+              target="_blank"
+              className="text-[11.5px] font-semibold text-[var(--accent)] hover:underline"
             >
-              {bankAccounts.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.label} · {b.bankName}
-                  {b.isDefault ? " (default)" : ""}
-                </option>
-              ))}
-            </select>
+              Manage accounts →
+            </a>
           </div>
-        )}
+
+          {bankAccounts.length === 0 ? (
+            <div className="flex items-center justify-between rounded-[10px] border border-dashed border-[var(--border)] bg-[var(--card-inset)] px-4 py-3 text-[12.5px] text-[var(--text-dim)]">
+              <span>No bank accounts added yet.</span>
+              <a
+                href="/banking/bank-accounts"
+                target="_blank"
+                className="font-semibold text-[var(--accent)] hover:underline"
+              >
+                + Add one
+              </a>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {bankAccounts.map((b) => {
+                const selected = bankAccountId === b.id;
+                return (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => setBankAccountId(b.id)}
+                    className={
+                      "w-full rounded-[10px] border px-4 py-3 text-left transition-colors " +
+                      (selected
+                        ? "border-[var(--accent)] bg-[rgba(246,217,78,.07)]"
+                        : "border-[var(--border)] bg-[var(--card-inset)] hover:border-[var(--border-2)] hover:bg-[var(--raised)]")
+                    }
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={
+                            "text-[13px] font-semibold " +
+                            (selected ? "text-[var(--accent)]" : "text-[var(--text)]")
+                          }>
+                            {b.label}
+                          </span>
+                          {b.isDefault && (
+                            <span className="rounded-[5px] bg-[var(--divider)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--text-dim)]">
+                              DEFAULT
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-0.5 truncate text-[11.5px] text-[var(--text-dim)]">
+                          {b.bankName} · A/C {b.accountNumber}
+                          {b.ifsc ? ` · ${b.ifsc}` : ""}
+                          {b.upi ? ` · UPI ${b.upi}` : ""}
+                        </div>
+                      </div>
+                      <span className={
+                        "mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 transition-colors " +
+                        (selected
+                          ? "border-[var(--accent)] bg-[var(--accent)]"
+                          : "border-[var(--border-2)]")
+                      } />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         <LineItemsEditor items={items} setItems={setItems} catalog={catalog} />
 

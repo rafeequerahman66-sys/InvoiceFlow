@@ -20,7 +20,7 @@ export default async function NewInvoicePage() {
     }),
     prisma.bankAccount.findMany({
       where: { orgId, archived: false },
-      select: { id: true, label: true, bankName: true, isDefault: true },
+      select: { id: true, label: true, bankName: true, accountNumber: true, ifsc: true, upi: true, isDefault: true },
       orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
     }),
   ]);
@@ -38,7 +38,7 @@ export default async function NewInvoicePage() {
           currency: c.defaultCurrency,
         }))}
         catalog={catalog.map((p) => ({ id: p.id, name: p.name, rate: Number(p.defaultRate), tax: Number(p.defaultTax) }))}
-        bankAccounts={bankAccounts.map((b) => ({ id: b.id, label: b.label, bankName: b.bankName, isDefault: b.isDefault }))}
+        bankAccounts={bankAccounts.map((b) => ({ id: b.id, label: b.label, bankName: b.bankName, accountNumber: b.accountNumber, ifsc: b.ifsc, upi: b.upi, isDefault: b.isDefault }))}
       />
     </AppShell>
   );
