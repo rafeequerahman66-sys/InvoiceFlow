@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { Button, ButtonLink, buttonClasses } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { fieldClasses, Label } from "@/components/ui/input";
 import {
@@ -91,9 +91,12 @@ export function InvoiceActions({
             Mark paid
           </Button>
         )}
-        <ButtonLink href={`/invoices/${invoiceId}/print`} variant="outline" size="sm" target="_blank">
-          Download PDF
-        </ButtonLink>
+        {/* Plain <a> (not Next Link): the route returns a binary PDF the client
+            router can't navigate to. Opens the generated PDF inline in the same
+            tab; the browser's viewer handles download/print. */}
+        <a href={`/api/pdf?invoiceId=${invoiceId}`} className={buttonClasses("outline", "sm")}>
+          View PDF
+        </a>
         <Button variant="outline" size="sm" disabled={busy} onClick={run(() => sendInvoice(invoiceId).then(() => router.refresh()))}>
           Send
         </Button>
