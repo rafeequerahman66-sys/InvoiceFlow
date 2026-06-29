@@ -14,7 +14,12 @@ type IconName =
   | "download"
   | "send"
   | "repeat"
-  | "doc";
+  | "doc"
+  | "bank"
+  | "credit-card"
+  | "user-check"
+  | "git-merge"
+  | "chevron-down";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   grid: (
@@ -113,6 +118,39 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M8.5 10.5h7M8.5 14h7M8.5 17h4" />
     </>
   ),
+  bank: (
+    <>
+      <path d="M3 21h18M3 10h18" />
+      <polygon points="12 3 3 10 21 10" />
+      <line x1="6" y1="10" x2="6" y2="21" />
+      <line x1="12" y1="10" x2="12" y2="21" />
+      <line x1="18" y1="10" x2="18" y2="21" />
+    </>
+  ),
+  "credit-card": (
+    <>
+      <rect x="2" y="5" width="20" height="14" rx="2.5" />
+      <path d="M2 10h20" />
+      <path d="M6 15h4" />
+    </>
+  ),
+  "user-check": (
+    <>
+      <circle cx="9" cy="8" r="3.1" />
+      <path d="M3.6 20a5.4 5.4 0 0 1 10.8 0" />
+      <path d="M16 11l2 2 4-4" />
+    </>
+  ),
+  "git-merge": (
+    <>
+      <circle cx="6" cy="6" r="2.5" />
+      <circle cx="6" cy="18" r="2.5" />
+      <circle cx="18" cy="6" r="2.5" />
+      <path d="M6 8.5v7" />
+      <path d="M18 8.5c0 5-5.5 7.5-12 7.5" />
+    </>
+  ),
+  "chevron-down": <path d="M6 9l6 6 6-6" />,
 };
 
 export function Icon({
