@@ -19,6 +19,30 @@ function isRetryable(err: unknown): boolean {
   return /can'?t reach database|connection (closed|reset|terminated)|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN/i.test(msg);
 }
 
+/**
+ * Run `fn`, retrying on transient connection-level errors with backoff.
+ * Used both for single queries (via the $allOperations extension) and — crucially
+ * — for whole `$transaction()` calls, which the extension does NOT cover. An
+ * interactive transaction bound to a dropped pooler connection can't be rescued
+ * per-statement, so the entire transaction must be retried from the top.
+ */
+export async function withDbRetry<T>(fn: () => Promise<T>): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= BACKOFFS.length; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (isRetryable(err) && attempt < BACKOFFS.length) {
+        await sleep(BACKOFFS[attempt]);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
+}
+
 function makeClient() {
   const base = new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
@@ -27,20 +51,7 @@ function makeClient() {
   return base.$extends({
     query: {
       async $allOperations({ args, query }) {
-        let lastErr: unknown;
-        for (let attempt = 0; attempt <= BACKOFFS.length; attempt++) {
-          try {
-            return await query(args);
-          } catch (err) {
-            lastErr = err;
-            if (isRetryable(err) && attempt < BACKOFFS.length) {
-              await sleep(BACKOFFS[attempt]);
-              continue;
-            }
-            throw err;
-          }
-        }
-        throw lastErr;
+        return withDbRetry(() => query(args));
       },
     },
   });

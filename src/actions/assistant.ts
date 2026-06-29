@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/db";
+import { prisma, withDbRetry } from "@/lib/db";
 import { requireOrg, hasRole } from "@/lib/tenant";
 import { createClient } from "./clients";
 import { markInvoicePaid } from "./invoices";
@@ -92,7 +92,7 @@ export async function executeAssistantAction(action: PendingAction): Promise<Ass
         supplyType === "EXPORT_LUT" || supplyType === "EXPORT_WITH_TAX" ? "Export of services" : client.stateCode ?? null;
       const bank = await prisma.bankAccount.findFirst({ where: { orgId, archived: false, isDefault: true }, select: { id: true } });
 
-      const invoice = await prisma.$transaction(async (tx) => {
+      const invoice = await withDbRetry(() => prisma.$transaction(async (tx) => {
         const { number, fyLabel } = await nextNumber(tx, orgId, "INVOICE", "INV", issueDate);
         return tx.invoice.create({
           data: {
@@ -133,7 +133,7 @@ export async function executeAssistantAction(action: PendingAction): Promise<Ass
             },
           },
         });
-      });
+      }));
 
       await prisma.activityLog.create({
         data: {

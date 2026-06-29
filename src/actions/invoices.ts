@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
+import { prisma, withDbRetry } from "@/lib/db";
 import { requireOrg } from "@/lib/tenant";
 import { nextNumber } from "@/lib/numbering";
 import { getFxRateToInr } from "@/lib/fx";
@@ -60,7 +60,7 @@ export async function createInvoice(input: CreateInvoiceInput) {
   const { client, supplyType, totals, fxRate, totalInr, placeOfSupply } = await buildInvoice(orgId, data);
   const bankAccountId = await resolveBankAccountId(orgId, data.bankAccountId);
 
-  const invoice = await prisma.$transaction(async (tx) => {
+  const invoice = await withDbRetry(() => prisma.$transaction(async (tx) => {
     const { number, fyLabel } = await nextNumber(tx, orgId, "INVOICE", "INV", data.issueDate);
     return tx.invoice.create({
       data: {
@@ -105,7 +105,7 @@ export async function createInvoice(input: CreateInvoiceInput) {
         },
       },
     });
-  });
+  }));
 
   await prisma.activityLog.create({
     data: {
@@ -132,48 +132,53 @@ export async function updateInvoice(invoiceId: string, input: CreateInvoiceInput
   const { supplyType, totals, fxRate, totalInr, placeOfSupply } = await buildInvoice(orgId, data);
   const bankAccountId = await resolveBankAccountId(orgId, data.bankAccountId);
 
-  await prisma.$transaction(async (tx) => {
-    await tx.invoiceItem.deleteMany({ where: { invoiceId } });
-    await tx.invoice.update({
-      where: { id: invoiceId },
-      data: {
-        clientId: data.clientId,
-        bankAccountId,
-        issueDate: data.issueDate,
-        dueDate: data.dueDate,
-        currency: data.currency,
-        fxRateToInr: fxRate,
-        supplyType,
-        placeOfSupply,
-        subtotal: totals.subtotal,
-        discountType: data.discountType,
-        discountValue: data.discountValue,
-        taxableValue: totals.taxableValue,
-        cgst: totals.cgst,
-        sgst: totals.sgst,
-        igst: totals.igst,
-        total: totals.total,
-        totalInr,
-        notes: data.notes ?? null,
-        terms: data.terms ?? null,
-        lutDeclaration: needsLutDeclaration(supplyType),
-        items: {
-          create: data.items.map((item, idx) => ({
-            name: item.name,
-            description: item.description ?? null,
-            sacCode: item.sacCode ?? null,
-            qty: item.qty,
-            unit: item.unit ?? "nos",
-            rate: item.rate,
-            taxRate: item.taxRate,
-            lineSubtotal: totals.lines[idx].lineSubtotal,
-            lineTax: totals.lines[idx].lineTax,
-            lineTotal: totals.lines[idx].lineTotal,
-          })),
+  // Batch (array) transaction — single round-trip, no connection held open
+  // across awaits, and retried as a whole on a transient pooler drop. Far more
+  // resilient on the Supabase pooler than an interactive transaction.
+  await withDbRetry(() =>
+    prisma.$transaction([
+      prisma.invoiceItem.deleteMany({ where: { invoiceId } }),
+      prisma.invoice.update({
+        where: { id: invoiceId },
+        data: {
+          clientId: data.clientId,
+          bankAccountId,
+          issueDate: data.issueDate,
+          dueDate: data.dueDate,
+          currency: data.currency,
+          fxRateToInr: fxRate,
+          supplyType,
+          placeOfSupply,
+          subtotal: totals.subtotal,
+          discountType: data.discountType,
+          discountValue: data.discountValue,
+          taxableValue: totals.taxableValue,
+          cgst: totals.cgst,
+          sgst: totals.sgst,
+          igst: totals.igst,
+          total: totals.total,
+          totalInr,
+          notes: data.notes ?? null,
+          terms: data.terms ?? null,
+          lutDeclaration: needsLutDeclaration(supplyType),
+          items: {
+            create: data.items.map((item, idx) => ({
+              name: item.name,
+              description: item.description ?? null,
+              sacCode: item.sacCode ?? null,
+              qty: item.qty,
+              unit: item.unit ?? "nos",
+              rate: item.rate,
+              taxRate: item.taxRate,
+              lineSubtotal: totals.lines[idx].lineSubtotal,
+              lineTax: totals.lines[idx].lineTax,
+              lineTotal: totals.lines[idx].lineTotal,
+            })),
+          },
         },
-      },
-    });
-  });
+      }),
+    ])
+  );
 
   revalidatePath(`/invoices/${invoiceId}`);
   revalidatePath("/invoices");
@@ -184,7 +189,7 @@ export async function duplicateInvoice(invoiceId: string) {
   const src = await prisma.invoice.findFirst({ where: { id: invoiceId, orgId }, include: { items: true } });
   if (!src) throw new Error("Invoice not found");
 
-  const copy = await prisma.$transaction(async (tx) => {
+  const copy = await withDbRetry(() => prisma.$transaction(async (tx) => {
     const { number, fyLabel } = await nextNumber(tx, orgId, "INVOICE", "INV", new Date());
     return tx.invoice.create({
       data: {
@@ -228,7 +233,7 @@ export async function duplicateInvoice(invoiceId: string) {
         },
       },
     });
-  });
+  }));
 
   revalidatePath("/invoices");
   redirect(`/invoices/${copy.id}`);
