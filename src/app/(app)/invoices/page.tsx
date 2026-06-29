@@ -12,6 +12,7 @@ import { Icon } from "@/components/icon";
 import { requireOrg } from "@/lib/tenant";
 import { InvoiceFilters } from "./invoice-filters";
 import { Suspense } from "react";
+import type { InvoiceStatus } from "@prisma/client";
 
 export default async function InvoicesPage({
   searchParams,
@@ -23,7 +24,7 @@ export default async function InvoicesPage({
 
   const where = {
     orgId,
-    ...(status && status !== "ALL" ? { status } : {}),
+    ...(status && status !== "ALL" ? { status: status as InvoiceStatus } : {}),
     ...(q
       ? {
           OR: [
