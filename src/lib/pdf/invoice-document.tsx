@@ -37,6 +37,7 @@ export type PdfBusiness = {
   address: string;
   email: string;
   phone?: string | null;
+  accountType?: string | null;
   bankName?: string | null;
   accountName?: string | null;
   bankAccount?: string | null;
@@ -45,148 +46,170 @@ export type PdfBusiness = {
   upi?: string | null;
 } | null;
 
-const C = {
-  ink: "#18181b",
-  mut: "#6b7280",
-  faint: "#9ca3af",
-  line: "#e5e7eb",
-  band: "#f3f4f6",
-  head: "#111827",
-};
+// Indigo/purple palette to match the reference invoice.
+const P = "#5b50e6"; // primary
+const PINK = "#7c5cff";
+const PL = "#f2f1fd"; // light lavender fill
+const PLINE = "#e4e1fa"; // lavender border
+const INK = "#1f2430";
+const MUT = "#6b7280";
+const FAINT = "#9ca3af";
 
 const s = StyleSheet.create({
-  page: { paddingTop: 34, paddingBottom: 56, paddingHorizontal: 34, fontSize: 9, color: C.ink, fontFamily: "Helvetica", lineHeight: 1.45 },
-  accentBar: { height: 4, backgroundColor: "#f6d94e", marginBottom: 14, marginHorizontal: -34, marginTop: -34 },
-  between: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  title: { fontSize: 22, fontFamily: "Helvetica-Bold", letterSpacing: 0.5, color: C.head },
-  metaTable: { marginTop: 2 },
-  metaRow: { flexDirection: "row", justifyContent: "flex-end" },
-  metaLabel: { color: C.mut, fontSize: 8.5, width: 70, textAlign: "right" },
-  metaVal: { fontFamily: "Helvetica-Bold", width: 95, textAlign: "right" },
+  page: { paddingTop: 30, paddingBottom: 70, paddingHorizontal: 32, fontSize: 9, color: INK, fontFamily: "Helvetica", lineHeight: 1.4 },
 
-  partyWrap: { flexDirection: "row", marginTop: 18, borderWidth: 1, borderColor: C.line, borderRadius: 4 },
-  partyCol: { flex: 1, padding: 10 },
-  partyDivider: { borderRightWidth: 1, borderColor: C.line },
-  partyLabel: { color: C.mut, fontSize: 8, marginBottom: 3 },
-  partyName: { fontFamily: "Helvetica-Bold", fontSize: 10.5, marginBottom: 2 },
-  partyLine: { color: C.mut, fontSize: 8.5 },
+  headRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  title: { fontSize: 24, fontFamily: "Helvetica-Bold", color: P, letterSpacing: 0.5 },
+  metaRow: { flexDirection: "row", marginTop: 4 },
+  metaLabel: { color: MUT, width: 74, fontSize: 9 },
+  metaVal: { fontFamily: "Helvetica-Bold", fontSize: 9 },
+  logoBox: { width: 60, height: 60, borderRadius: 8, backgroundColor: "#111111", alignItems: "center", justifyContent: "center" },
+  logoText: { color: "#ffffff", fontFamily: "Helvetica-Bold", fontSize: 15 },
 
-  supply: { flexDirection: "row", justifyContent: "center", backgroundColor: C.band, paddingVertical: 5, marginTop: 10, borderRadius: 4 },
-  supplyItem: { marginHorizontal: 14, fontSize: 8.5 },
+  party: { flexDirection: "row", marginTop: 18, backgroundColor: PL, borderWidth: 1, borderColor: PLINE, borderRadius: 6 },
+  partyCol: { flex: 1, padding: 12 },
+  partyDivider: { borderRightWidth: 1, borderColor: PLINE },
+  partyLabel: { color: P, fontFamily: "Helvetica-Bold", fontSize: 10, marginBottom: 4 },
+  partyName: { fontFamily: "Helvetica-Bold", fontSize: 10, marginBottom: 2 },
+  partyLine: { color: "#4b5563", fontSize: 8.5 },
+  bold: { fontFamily: "Helvetica-Bold" },
 
-  th: { flexDirection: "row", backgroundColor: C.head, color: "#fff", paddingVertical: 5, paddingHorizontal: 6, marginTop: 16, fontFamily: "Helvetica-Bold", fontSize: 8 },
-  tr: { flexDirection: "row", paddingVertical: 6, paddingHorizontal: 6, borderBottomWidth: 1, borderColor: C.line },
-  cIdx: { width: 16 },
+  supply: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 6, paddingVertical: 8, marginTop: 12 },
+
+  th: { flexDirection: "row", backgroundColor: P, color: "#fff", paddingVertical: 6, paddingHorizontal: 8, fontFamily: "Helvetica-Bold", fontSize: 8 },
+  tr: { flexDirection: "row", backgroundColor: PL, paddingVertical: 8, paddingHorizontal: 8, borderBottomWidth: 1, borderColor: PLINE },
+  cIdx: { width: 14 },
   cItem: { flex: 1, paddingRight: 6 },
-  cSac: { width: 46 },
-  cGst: { width: 32, textAlign: "right" },
-  cQty: { width: 26, textAlign: "right" },
+  cSac: { width: 48, textAlign: "center" },
+  cGst: { width: 34, textAlign: "right" },
+  cQty: { width: 40, textAlign: "right" },
   cRate: { width: 52, textAlign: "right" },
   cAmt: { width: 58, textAlign: "right" },
-  cTax: { width: 52, textAlign: "right" },
-  cTot: { width: 60, textAlign: "right" },
+  cTax: { width: 48, textAlign: "right" },
+  cTot: { width: 58, textAlign: "right" },
   itemName: { fontFamily: "Helvetica-Bold", fontSize: 9 },
-  itemDesc: { color: C.mut, fontSize: 8, marginTop: 1 },
+  itemDesc: { color: MUT, fontSize: 8, marginTop: 1 },
 
-  bottom: { flexDirection: "row", justifyContent: "space-between", marginTop: 14 },
-  bottomLeft: { width: 270 },
-  totalsBox: { width: 200 },
-  totRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 },
-  grand: { flexDirection: "row", justifyContent: "space-between", backgroundColor: C.head, color: "#fff", paddingVertical: 6, paddingHorizontal: 8, marginTop: 4, fontFamily: "Helvetica-Bold", fontSize: 11, borderRadius: 3 },
+  termsInItem: { marginTop: 8 },
+  termsHead: { fontFamily: "Helvetica-Bold", fontSize: 8.5, marginBottom: 2 },
+  bullet: { flexDirection: "row", marginBottom: 1 },
 
-  sectionLabel: { fontFamily: "Helvetica-Bold", fontSize: 9, marginBottom: 4 },
-  words: { fontSize: 9 },
-  wordsVal: { fontFamily: "Helvetica-Bold" },
+  wordsRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 12, alignItems: "flex-start" },
+  words: { fontSize: 9, flex: 1, paddingRight: 12 },
+  amtBox: { width: 200 },
+  amtRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 },
 
-  bankGrid: { marginTop: 2 },
+  lower: { flexDirection: "row", justifyContent: "space-between", marginTop: 14, alignItems: "flex-start" },
+  bankWrap: { flex: 1, paddingRight: 16 },
+  bankHead: { color: P, fontFamily: "Helvetica-Bold", fontSize: 10, marginBottom: 4 },
   bankRow: { flexDirection: "row", paddingVertical: 1.5 },
-  bankLabel: { width: 86, color: C.mut, fontSize: 8.5 },
-  bankVal: { flex: 1, fontSize: 8.5 },
+  bankLabel: { width: 90, color: MUT, fontSize: 8.5 },
+  bankVal: { flex: 1, fontFamily: "Helvetica-Bold", fontSize: 8.5 },
 
-  bullet: { flexDirection: "row", marginBottom: 1.5 },
+  rightCol: { width: 210 },
+  grand: { flexDirection: "row", justifyContent: "space-between", backgroundColor: P, color: "#fff", paddingVertical: 8, paddingHorizontal: 10, borderRadius: 4, fontFamily: "Helvetica-Bold", fontSize: 12 },
+  sign: { alignItems: "center", marginTop: 26 },
+  signLine: { width: 150, borderTopWidth: 1, borderColor: MUT, marginTop: 26, paddingTop: 3, textAlign: "center", color: MUT, fontSize: 8.5 },
 
-  sign: { alignItems: "flex-end", marginTop: 26 },
-  signLine: { width: 150, borderTopWidth: 1, borderColor: C.mut, marginTop: 28, paddingTop: 3, textAlign: "center", color: C.mut, fontSize: 8 },
+  tnc: { marginTop: 24, borderTopWidth: 1, borderColor: PLINE, paddingTop: 10 },
+  tncHead: { color: P, fontFamily: "Helvetica-Bold", fontSize: 10, marginBottom: 4 },
 
-  footer: { position: "absolute", bottom: 22, left: 34, right: 34, flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderColor: C.line, paddingTop: 6, fontSize: 7.5, color: C.faint },
+  footer: { position: "absolute", bottom: 26, left: 32, right: 32, borderTopWidth: 1, borderColor: PLINE, borderStyle: "dashed", paddingTop: 6, flexDirection: "row", justifyContent: "space-between" },
+  footCell: { flexDirection: "column" },
+  footLabel: { color: FAINT, fontSize: 7 },
+  footVal: { fontSize: 8, fontFamily: "Helvetica-Bold" },
 });
 
 const COUNTRY: Record<string, string> = { IN: "India", US: "United States", GB: "United Kingdom", AE: "United Arab Emirates", DE: "Germany" };
 
+/** First word of the brand, lowercased — mirrors the compact logo mark ("rin"). */
+function logoMark(name: string): string {
+  return (name.split(/\s+/)[0] || name).slice(0, 6).toLowerCase();
+}
+
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <Text style={{ color: "#4b5563", fontSize: 8.5 }}>
+      <Text style={{ fontFamily: "Helvetica-Bold", color: INK }}>{label} </Text>
+      {value}
+    </Text>
+  );
+}
+
 export function InvoiceDocument({ invoice, business }: { invoice: PdfInvoice; business: PdfBusiness }) {
   const intra = invoice.supplyType === "INTRA_STATE";
   const cur = invoice.currency;
+  const brand = business?.brandName ?? "Rin Media";
   const billedToName = invoice.client.company ?? invoice.client.name;
   const taxLabel = intra ? "GST" : "IGST";
-  const totalTax = intra ? invoice.cgst + invoice.sgst : invoice.igst;
   const countryName = COUNTRY[invoice.client.country ?? "IN"] ?? invoice.client.country ?? "India";
   const terms = (invoice.terms ?? "").split(/\r?\n/).map((t) => t.trim()).filter(Boolean);
-
   const hasBank = business?.bankAccount || business?.bankName || business?.upi;
+  const shortDate = invoice.issueDate;
 
   return (
     <Document>
       <Page size="A4" style={s.page}>
-        <View style={s.accentBar} fixed />
-
         {/* Header */}
-        <View style={s.between}>
+        <View style={s.headRow}>
           <View style={{ flex: 1 }}>
-            <Text style={s.title}>TAX INVOICE</Text>
-            <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 11, marginTop: 6 }}>{business?.brandName ?? "Rin Media"}</Text>
-            {business?.legalName ? <Text style={s.partyLine}>{business.legalName}</Text> : null}
+            <Text style={s.title}>INVOICE</Text>
+            <View style={{ marginTop: 6 }}>
+              <View style={s.metaRow}>
+                <Text style={s.metaLabel}>Invoice No</Text>
+                <Text style={s.metaVal}>{invoice.number}</Text>
+              </View>
+              <View style={s.metaRow}>
+                <Text style={s.metaLabel}>Invoice Date</Text>
+                <Text style={s.metaVal}>{invoice.issueDate}</Text>
+              </View>
+              <View style={s.metaRow}>
+                <Text style={s.metaLabel}>Due Date</Text>
+                <Text style={s.metaVal}>{invoice.dueDate}</Text>
+              </View>
+            </View>
           </View>
-          <View style={s.metaTable}>
-            <View style={s.metaRow}>
-              <Text style={s.metaLabel}>Invoice No</Text>
-              <Text style={s.metaVal}>{invoice.number}</Text>
-            </View>
-            <View style={s.metaRow}>
-              <Text style={s.metaLabel}>Invoice Date</Text>
-              <Text style={s.metaVal}>{invoice.issueDate}</Text>
-            </View>
-            <View style={s.metaRow}>
-              <Text style={s.metaLabel}>Due Date</Text>
-              <Text style={s.metaVal}>{invoice.dueDate}</Text>
-            </View>
+          <View style={s.logoBox}>
+            <Text style={s.logoText}>{logoMark(brand)}</Text>
           </View>
         </View>
 
         {/* Billed By / Billed To */}
-        <View style={s.partyWrap}>
+        <View style={s.party}>
           <View style={[s.partyCol, s.partyDivider]}>
             <Text style={s.partyLabel}>Billed By</Text>
-            <Text style={s.partyName}>{business?.brandName ?? "Rin Media"}</Text>
+            <Text style={s.partyName}>
+              {brand}
+              {business?.legalName && business.legalName !== brand ? ` (${business.legalName})` : ""}
+            </Text>
             {business?.address ? <Text style={s.partyLine}>{business.address}</Text> : null}
-            {business?.gstin ? <Text style={s.partyLine}>GSTIN: {business.gstin}</Text> : null}
-            {business?.email ? <Text style={s.partyLine}>Email: {business.email}</Text> : null}
-            {business?.phone ? <Text style={s.partyLine}>Phone: {business.phone}</Text> : null}
+            {business?.gstin ? <Field label="GSTIN:" value={business.gstin} /> : null}
+            {business?.email ? <Field label="Email:" value={business.email} /> : null}
+            {business?.phone ? <Field label="Phone:" value={business.phone} /> : null}
           </View>
           <View style={s.partyCol}>
             <Text style={s.partyLabel}>Billed To</Text>
             <Text style={s.partyName}>{billedToName}</Text>
             {invoice.client.billingAddress ? <Text style={s.partyLine}>{invoice.client.billingAddress}</Text> : null}
-            {invoice.client.gstin ? <Text style={s.partyLine}>GSTIN: {invoice.client.gstin}</Text> : null}
-            {invoice.client.company && invoice.client.name !== invoice.client.company ? (
-              <Text style={s.partyLine}>Contact: {invoice.client.name}</Text>
-            ) : null}
-            {invoice.client.phone ? <Text style={s.partyLine}>Phone: {invoice.client.phone}</Text> : null}
+            {invoice.client.gstin ? <Field label="GSTIN:" value={invoice.client.gstin} /> : null}
+            {invoice.client.company && invoice.client.name !== invoice.client.company ? <Field label="Contact Person:" value={invoice.client.name} /> : null}
+            {invoice.client.phone ? <Field label="Contact Phone:" value={invoice.client.phone} /> : null}
           </View>
         </View>
 
         {/* Supply */}
         <View style={s.supply}>
-          <Text style={s.supplyItem}>Country of Supply: <Text style={{ fontFamily: "Helvetica-Bold" }}>{countryName}</Text></Text>
-          <Text style={s.supplyItem}>Place of Supply: <Text style={{ fontFamily: "Helvetica-Bold" }}>{invoice.placeOfSupply || "—"}</Text></Text>
+          <Field label="Country of Supply:" value={countryName} />
+          <Field label="Place of Supply:" value={invoice.placeOfSupply || "—"} />
         </View>
 
         {/* Items table */}
         <View style={s.th}>
-          <Text style={s.cIdx}>#</Text>
+          <Text style={s.cIdx}> </Text>
           <Text style={s.cItem}>Item</Text>
           <Text style={s.cSac}>HSN/SAC</Text>
-          <Text style={s.cGst}>GST%</Text>
-          <Text style={s.cQty}>Qty</Text>
+          <Text style={s.cGst}>GST Rate</Text>
+          <Text style={s.cQty}>Quantity</Text>
           <Text style={s.cRate}>Rate</Text>
           <Text style={s.cAmt}>Amount</Text>
           <Text style={s.cTax}>{taxLabel}</Text>
@@ -194,12 +217,24 @@ export function InvoiceDocument({ invoice, business }: { invoice: PdfInvoice; bu
         </View>
         {invoice.items.map((it, i) => {
           const amount = it.lineTotal - it.lineTax;
+          const last = i === invoice.items.length - 1;
           return (
             <View style={s.tr} key={i} wrap={false}>
-              <Text style={s.cIdx}>{i + 1}</Text>
+              <Text style={s.cIdx}>{i + 1}.</Text>
               <View style={s.cItem}>
                 <Text style={s.itemName}>{it.name}</Text>
                 {it.description ? <Text style={s.itemDesc}>{it.description}</Text> : null}
+                {last && terms.length > 0 ? (
+                  <View style={s.termsInItem}>
+                    <Text style={s.termsHead}>Payment Terms:</Text>
+                    {terms.map((t, j) => (
+                      <View style={s.bullet} key={j}>
+                        <Text style={{ width: 8 }}>•</Text>
+                        <Text style={{ flex: 1, color: MUT, fontSize: 8 }}>{t}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
               </View>
               <Text style={s.cSac}>{it.sacCode || "—"}</Text>
               <Text style={s.cGst}>{it.taxRate}%</Text>
@@ -212,67 +247,43 @@ export function InvoiceDocument({ invoice, business }: { invoice: PdfInvoice; bu
           );
         })}
 
-        {/* Words + Totals */}
-        <View style={s.bottom}>
-          <View style={s.bottomLeft}>
-            <Text style={s.words}>
-              Total (in words): <Text style={s.wordsVal}>{amountInWords(invoice.total, cur).toUpperCase()}</Text>
-            </Text>
-          </View>
-          <View style={s.totalsBox}>
-            <View style={s.totRow}>
-              <Text style={{ color: C.mut }}>Amount</Text>
+        {/* Words + Amount/Tax */}
+        <View style={s.wordsRow}>
+          <Text style={s.words}>
+            <Text style={s.bold}>Total (in words): </Text>
+            {amountInWords(invoice.total, cur).toUpperCase()}
+          </Text>
+          <View style={s.amtBox}>
+            <View style={s.amtRow}>
+              <Text style={{ color: MUT }}>Amount</Text>
               <Text>{formatMoney(invoice.taxableValue, cur)}</Text>
             </View>
             {intra ? (
               <>
-                <View style={s.totRow}>
-                  <Text style={{ color: C.mut }}>CGST</Text>
+                <View style={s.amtRow}>
+                  <Text style={{ color: MUT }}>CGST</Text>
                   <Text>{formatMoney(invoice.cgst, cur)}</Text>
                 </View>
-                <View style={s.totRow}>
-                  <Text style={{ color: C.mut }}>SGST</Text>
+                <View style={s.amtRow}>
+                  <Text style={{ color: MUT }}>SGST</Text>
                   <Text>{formatMoney(invoice.sgst, cur)}</Text>
                 </View>
               </>
             ) : (
-              <View style={s.totRow}>
-                <Text style={{ color: C.mut }}>IGST</Text>
-                <Text>{formatMoney(totalTax, cur)}</Text>
+              <View style={s.amtRow}>
+                <Text style={{ color: MUT }}>IGST</Text>
+                <Text>{formatMoney(invoice.igst, cur)}</Text>
               </View>
             )}
-            <View style={s.grand}>
-              <Text>Total ({cur})</Text>
-              <Text>{formatMoney(invoice.total, cur)}</Text>
-            </View>
           </View>
         </View>
 
-        {invoice.lutDeclaration ? (
-          <Text style={[s.partyLine, { marginTop: 12 }]}>Supply meant for export of services under LUT without payment of IGST.</Text>
-        ) : null}
-
-        {/* Payment terms + Bank details */}
-        <View style={[s.between, { marginTop: 18 }]}>
-          <View style={{ flex: 1, paddingRight: 16 }}>
-            {terms.length > 0 ? (
+        {/* Bank details + Total(INR) + signature */}
+        <View style={s.lower}>
+          <View style={s.bankWrap}>
+            {hasBank ? (
               <>
-                <Text style={s.sectionLabel}>Payment Terms</Text>
-                {terms.map((t, i) => (
-                  <View style={s.bullet} key={i}>
-                    <Text style={{ width: 8 }}>•</Text>
-                    <Text style={{ flex: 1, color: C.mut, fontSize: 8.5 }}>{t}</Text>
-                  </View>
-                ))}
-              </>
-            ) : null}
-            {invoice.notes ? <Text style={[s.partyLine, { marginTop: terms.length ? 8 : 0 }]}>{invoice.notes}</Text> : null}
-          </View>
-
-          {hasBank ? (
-            <View style={{ width: 240 }}>
-              <Text style={s.sectionLabel}>Bank Details</Text>
-              <View style={s.bankGrid}>
+                <Text style={s.bankHead}>Bank Details</Text>
                 {business?.accountName ? (
                   <View style={s.bankRow}>
                     <Text style={s.bankLabel}>Account Name</Text>
@@ -291,16 +302,16 @@ export function InvoiceDocument({ invoice, business }: { invoice: PdfInvoice; bu
                     <Text style={s.bankVal}>{business.ifsc}</Text>
                   </View>
                 ) : null}
+                {business?.accountType ? (
+                  <View style={s.bankRow}>
+                    <Text style={s.bankLabel}>Account Type</Text>
+                    <Text style={s.bankVal}>{business.accountType}</Text>
+                  </View>
+                ) : null}
                 {business?.bankName ? (
                   <View style={s.bankRow}>
                     <Text style={s.bankLabel}>Bank</Text>
                     <Text style={s.bankVal}>{business.bankName}</Text>
-                  </View>
-                ) : null}
-                {business?.branch ? (
-                  <View style={s.bankRow}>
-                    <Text style={s.bankLabel}>Branch</Text>
-                    <Text style={s.bankVal}>{business.branch}</Text>
                   </View>
                 ) : null}
                 {business?.upi ? (
@@ -309,20 +320,58 @@ export function InvoiceDocument({ invoice, business }: { invoice: PdfInvoice; bu
                     <Text style={s.bankVal}>{business.upi}</Text>
                   </View>
                 ) : null}
-              </View>
+              </>
+            ) : null}
+          </View>
+
+          <View style={s.rightCol}>
+            <View style={s.grand}>
+              <Text>Total ({cur})</Text>
+              <Text>{formatMoney(invoice.total, cur)}</Text>
             </View>
-          ) : null}
+            <View style={s.sign}>
+              <Text style={s.signLine}>Authorised Signatory</Text>
+            </View>
+          </View>
         </View>
 
-        {/* Signatory */}
-        <View style={s.sign}>
-          <Text style={s.signLine}>Authorised Signatory</Text>
+        {invoice.lutDeclaration ? (
+          <Text style={[s.partyLine, { marginTop: 12 }]}>Supply meant for export of services under LUT without payment of IGST.</Text>
+        ) : null}
+
+        {invoice.notes ? <Text style={[s.partyLine, { marginTop: 12 }]}>{invoice.notes}</Text> : null}
+
+        {/* Terms & Conditions */}
+        <View style={s.tnc}>
+          <Text style={s.tncHead}>Terms and Conditions</Text>
+          <View style={s.bullet}>
+            <Text style={{ width: 12 }}>1.</Text>
+            <Text style={{ flex: 1, color: MUT, fontSize: 8.5 }}>Kindly mention Invoice Number while making payment.</Text>
+          </View>
+          {business?.email || business?.phone ? (
+            <Text style={{ color: MUT, fontSize: 8.5, marginTop: 4 }}>
+              For any enquiry, reach out
+              {business?.email ? ` via email at ${business.email}` : ""}
+              {business?.phone ? `, call on ${business.phone}` : ""}.
+            </Text>
+          ) : null}
         </View>
 
         {/* Per-page footer */}
         <View style={s.footer} fixed>
-          <Text>{invoice.number} · {invoice.issueDate} · {billedToName}</Text>
-          <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
+          <View style={s.footCell}>
+            <Text style={s.footLabel}>Invoice No</Text>
+            <Text style={s.footVal}>{invoice.number}</Text>
+          </View>
+          <View style={s.footCell}>
+            <Text style={s.footLabel}>Invoice Date</Text>
+            <Text style={s.footVal}>{shortDate}</Text>
+          </View>
+          <View style={[s.footCell, { flex: 1, marginLeft: 16 }]}>
+            <Text style={s.footLabel}>Billed To</Text>
+            <Text style={s.footVal}>{billedToName}</Text>
+          </View>
+          <Text style={{ color: FAINT, fontSize: 7.5 }} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
         </View>
       </Page>
     </Document>
