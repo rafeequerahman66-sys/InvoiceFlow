@@ -14,7 +14,7 @@ import { requireOrg } from "@/lib/tenant";
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export default async function DashboardPage() {
-  const { orgId } = await requireOrg();
+  const { orgId, orgName, userName } = await requireOrg();
   const [recent, all, recentQuotes] = await Promise.all([
     prisma.invoice.findMany({ where: { orgId }, include: { client: true }, orderBy: { issueDate: "desc" }, take: 6 }),
     prisma.invoice.findMany({ where: { orgId } }),
@@ -75,7 +75,7 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <AppShell title="Dashboard" subtitle="Welcome back, Rin Media">
+    <AppShell title="Dashboard" subtitle={`Welcome back, ${userName ?? orgName}`}>
       {/* KPI row */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {kpis.map((k) => (

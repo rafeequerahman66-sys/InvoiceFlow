@@ -8,26 +8,45 @@ import { Card } from "@/components/ui/card";
 import { Table, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { Icon } from "@/components/icon";
 import { requireOrg } from "@/lib/tenant";
+import { ClientSearch } from "./client-search";
+import { Suspense } from "react";
 
 const COUNTRY_NAMES: Record<string, string> = {
   IN: "India", US: "USA", GB: "UK", DE: "Germany", AE: "UAE",
   SG: "Singapore", AU: "Australia", CA: "Canada",
 };
 
-export default async function ClientsPage() {
+export default async function ClientsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
   const { orgId } = await requireOrg();
+  const { q } = await searchParams;
   const clients = await prisma.client.findMany({ where: { orgId, archived: false }, orderBy: { name: "asc" } });
+
+  const filtered = q
+    ? clients.filter(
+        (c) =>
+          c.name.toLowerCase().includes(q.toLowerCase()) ||
+          (c.company ?? "").toLowerCase().includes(q.toLowerCase()) ||
+          (c.gstin ?? "").toLowerCase().includes(q.toLowerCase())
+      )
+    : clients;
 
   return (
     <AppShell
       title="Clients"
-      subtitle={`${clients.length} total`}
+      subtitle={`${filtered.length} of ${clients.length}`}
       action={
         <ButtonLink href="/clients/new" className="gap-1.5">
           <Icon name="plus" size={16} className="text-[var(--accent-ink)]" /> New Client
         </ButtonLink>
       }
     >
+      <Suspense>
+        <ClientSearch />
+      </Suspense>
       <Card className="overflow-hidden">
         <Table>
           <Thead>
@@ -39,7 +58,7 @@ export default async function ClientsPage() {
             <Th>Email</Th>
           </Thead>
           <tbody>
-            {clients.map((c) => (
+            {filtered.map((c) => (
               <Tr key={c.id}>
                 <Td className="font-semibold">
                   <Link href={`/clients/${c.id}`} className="text-[var(--accent)] hover:underline">
@@ -53,14 +72,20 @@ export default async function ClientsPage() {
                 <Td className="text-[var(--text-dim)]">{c.email ?? "—"}</Td>
               </Tr>
             ))}
-            {clients.length === 0 && (
+            {filtered.length === 0 && (
               <tr>
                 <td colSpan={6} className="p-10 text-center text-[13px] text-[var(--text-dim)]">
-                  No clients yet.{" "}
-                  <Link href="/clients/new" className="text-[var(--accent)] hover:underline">
-                    Add your first client
-                  </Link>
-                  .
+                  {clients.length === 0 ? (
+                    <>
+                      No clients yet.{" "}
+                      <Link href="/clients/new" className="text-[var(--accent)] hover:underline">
+                        Add your first client
+                      </Link>
+                      .
+                    </>
+                  ) : (
+                    "No clients match the search."
+                  )}
                 </td>
               </tr>
             )}
