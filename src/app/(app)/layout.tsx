@@ -4,6 +4,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { OrgSwitcher } from "@/components/org-switcher";
 import { SignOutButton } from "@/components/sign-out-button";
+import { AssistantWidget } from "@/components/assistant/assistant-widget";
 import { requireOrg, getUserOrgs } from "@/lib/tenant";
 
 function initials(s: string): string {
@@ -60,6 +61,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       {/* Page content — swaps on every navigation, sidebar stays */}
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+
+      {/* AI Finance Assistant — floating, present on every authed page */}
+      <AssistantWidget orgId={ctx.orgId} orgName={ctx.orgName} />
     </div>
   );
 }

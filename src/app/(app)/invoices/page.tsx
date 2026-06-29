@@ -12,7 +12,7 @@ import { Icon } from "@/components/icon";
 import { requireOrg } from "@/lib/tenant";
 import { InvoiceFilters } from "./invoice-filters";
 import { Suspense } from "react";
-import type { InvoiceStatus } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 export default async function InvoicesPage({
   searchParams,
@@ -22,9 +22,13 @@ export default async function InvoicesPage({
   const { orgId } = await requireOrg();
   const { q, status } = await searchParams;
 
-  const where = {
+  // Typed as Prisma.InvoiceWhereInput so the dynamic `status` (a plain string
+  // from searchParams) is accepted under BOTH schemas: sqlite (String) and
+  // postgres (InvoiceStatus enum). The enum type itself isn't exported by the
+  // sqlite client, so we cast to the field's input type instead of importing it.
+  const where: Prisma.InvoiceWhereInput = {
     orgId,
-    ...(status && status !== "ALL" ? { status: status as InvoiceStatus } : {}),
+    ...(status && status !== "ALL" ? { status: status as Prisma.InvoiceWhereInput["status"] } : {}),
     ...(q
       ? {
           OR: [

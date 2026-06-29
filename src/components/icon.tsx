@@ -19,7 +19,9 @@ type IconName =
   | "credit-card"
   | "user-check"
   | "git-merge"
-  | "chevron-down";
+  | "chevron-down"
+  | "sparkles"
+  | "close";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   grid: (
@@ -151,6 +153,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   "chevron-down": <path d="M6 9l6 6 6-6" />,
+  sparkles: (
+    <>
+      <path d="M12 3l1.8 4.9L18.7 9.7l-4.9 1.8L12 16.4l-1.8-4.9L5.3 9.7l4.9-1.8L12 3z" />
+      <path d="M19 14l.8 2.2 2.2.8-2.2.8L19 20l-.8-2.2-2.2-.8 2.2-.8L19 14z" />
+    </>
+  ),
+  close: <path d="M6 6l12 12M18 6L6 18" />,
 };
 
 export function Icon({
