@@ -68,15 +68,17 @@ export default async function ReportsPage() {
       action={
         <div className="flex gap-2">
           <a className={exportBtn} href="/api/export?type=invoices">
-            <Icon name="download" size={15} /> Invoices CSV
+            <Icon name="download" size={15} />
+            <span className="hidden sm:inline">Invoices</span> CSV
           </a>
           <a className={buttonClasses("primary", "sm", "gap-1.5")} href="/api/export?type=gst">
-            <Icon name="download" size={15} className="text-[var(--accent-ink)]" /> GST CSV
+            <Icon name="download" size={15} className="text-[var(--accent-ink)]" />
+            <span className="hidden sm:inline">GST</span> CSV
           </a>
         </div>
       }
     >
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {kpiCards.map((k) => (
           <Card key={k.label} className="p-[18px]">
             <div className="text-[12.5px] text-[var(--text-soft)]">{k.label}</div>
@@ -85,7 +87,7 @@ export default async function ReportsPage() {
         ))}
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[1.62fr_1fr]">
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:mt-4 sm:gap-4 lg:grid-cols-[1.62fr_1fr]">
         <Card>
           <CardHeader>Revenue by Month (₹)</CardHeader>
           <CardBody>
@@ -116,9 +118,10 @@ export default async function ReportsPage() {
         </Card>
       </div>
 
-      <Card className="mt-4 overflow-hidden">
+      <Card className="mt-3 overflow-hidden sm:mt-4">
         <CardHeader>GST Summary Report</CardHeader>
         <CardBody className="p-0">
+          <div className="overflow-x-auto">
           <Table>
             <Thead>
               <Th>Period</Th>
@@ -148,6 +151,7 @@ export default async function ReportsPage() {
               )}
             </tbody>
           </Table>
+          </div>
         </CardBody>
       </Card>
     </AppShell>

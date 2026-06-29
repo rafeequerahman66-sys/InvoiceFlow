@@ -3,12 +3,12 @@ import { ButtonLink } from "@/components/ui/button";
 
 function Topbar({ title, subtitle, action }: { title: string; subtitle?: string; action?: React.ReactNode }) {
   return (
-    <header className="sticky top-0 z-30 flex h-[70px] items-center justify-between border-b border-[var(--shell-border)] bg-[var(--app-bg)]/95 px-7 backdrop-blur">
-      <div>
-        <h1 className="text-[19px] font-extrabold tracking-[-0.02em] text-[var(--text)]">{title}</h1>
-        {subtitle && <p className="text-[12.5px] text-[var(--text-dim)]">{subtitle}</p>}
+    <header className="sticky top-0 z-30 flex min-h-[70px] flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-[var(--shell-border)] bg-[var(--app-bg)]/95 px-4 py-3 backdrop-blur sm:h-[70px] sm:flex-nowrap sm:px-7 sm:py-0">
+      <div className="min-w-0">
+        <h1 className="truncate text-[17px] font-extrabold tracking-[-0.02em] text-[var(--text)] sm:text-[19px]">{title}</h1>
+        {subtitle && <p className="text-[12px] text-[var(--text-dim)] sm:text-[12.5px]">{subtitle}</p>}
       </div>
-      <div className="flex items-center gap-2.5">
+      <div className="flex shrink-0 items-center gap-2">
         <button
           aria-label="Notifications"
           className="relative grid h-[38px] w-[38px] place-items-center rounded-[10px] border border-[var(--border-2)] text-[var(--text-mid)] hover:text-[var(--text)]"
@@ -44,7 +44,7 @@ export function AppShell({
     <>
       <Topbar title={title} subtitle={subtitle} action={action} />
       <main className="flex-1">
-        <div className="mx-auto max-w-[1320px] px-7 pb-16 pt-6">{children}</div>
+        <div className="mx-auto max-w-[1320px] px-4 pb-16 pt-5 sm:px-7 sm:pt-6">{children}</div>
       </main>
     </>
   );
