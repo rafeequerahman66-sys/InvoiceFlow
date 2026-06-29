@@ -6,8 +6,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Manrope", "ui-sans-serif", "system-ui", "sans-serif"],
-        mono: ["'JetBrains Mono'", "ui-monospace", "monospace"],
+        sans: ["var(--font-manrope)", "Manrope", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono)", "'JetBrains Mono'", "ui-monospace", "monospace"],
       },
       colors: {
         accent: "var(--accent)",

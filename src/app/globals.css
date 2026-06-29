@@ -64,7 +64,7 @@
 body {
   background: var(--app-bg);
   color: var(--text);
-  font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-manrope, "Manrope"), ui-sans-serif, system-ui, sans-serif;
   font-feature-settings: "ss01";
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
