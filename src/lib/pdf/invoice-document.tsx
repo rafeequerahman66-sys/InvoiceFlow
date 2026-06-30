@@ -1,6 +1,6 @@
 /* eslint-disable jsx-a11y/alt-text */
 import { Document, Page, View, Text, StyleSheet } from "@react-pdf/renderer";
-import { formatMoney } from "@/lib/money";
+import { formatMoneyPdf } from "@/lib/money";
 import { amountInWords } from "@/lib/amount-in-words";
 
 export type PdfInvoice = {
@@ -239,10 +239,10 @@ export function InvoiceDocument({ invoice, business }: { invoice: PdfInvoice; bu
               <Text style={s.cSac}>{it.sacCode || "—"}</Text>
               <Text style={s.cGst}>{it.taxRate}%</Text>
               <Text style={s.cQty}>{it.qty}</Text>
-              <Text style={s.cRate}>{formatMoney(it.rate, cur)}</Text>
-              <Text style={s.cAmt}>{formatMoney(amount, cur)}</Text>
-              <Text style={s.cTax}>{formatMoney(it.lineTax, cur)}</Text>
-              <Text style={s.cTot}>{formatMoney(it.lineTotal, cur)}</Text>
+              <Text style={s.cRate}>{formatMoneyPdf(it.rate, cur)}</Text>
+              <Text style={s.cAmt}>{formatMoneyPdf(amount, cur)}</Text>
+              <Text style={s.cTax}>{formatMoneyPdf(it.lineTax, cur)}</Text>
+              <Text style={s.cTot}>{formatMoneyPdf(it.lineTotal, cur)}</Text>
             </View>
           );
         })}
@@ -256,23 +256,23 @@ export function InvoiceDocument({ invoice, business }: { invoice: PdfInvoice; bu
           <View style={s.amtBox}>
             <View style={s.amtRow}>
               <Text style={{ color: MUT }}>Amount</Text>
-              <Text>{formatMoney(invoice.taxableValue, cur)}</Text>
+              <Text>{formatMoneyPdf(invoice.taxableValue, cur)}</Text>
             </View>
             {intra ? (
               <>
                 <View style={s.amtRow}>
                   <Text style={{ color: MUT }}>CGST</Text>
-                  <Text>{formatMoney(invoice.cgst, cur)}</Text>
+                  <Text>{formatMoneyPdf(invoice.cgst, cur)}</Text>
                 </View>
                 <View style={s.amtRow}>
                   <Text style={{ color: MUT }}>SGST</Text>
-                  <Text>{formatMoney(invoice.sgst, cur)}</Text>
+                  <Text>{formatMoneyPdf(invoice.sgst, cur)}</Text>
                 </View>
               </>
             ) : (
               <View style={s.amtRow}>
                 <Text style={{ color: MUT }}>IGST</Text>
-                <Text>{formatMoney(invoice.igst, cur)}</Text>
+                <Text>{formatMoneyPdf(invoice.igst, cur)}</Text>
               </View>
             )}
           </View>
@@ -327,7 +327,7 @@ export function InvoiceDocument({ invoice, business }: { invoice: PdfInvoice; bu
           <View style={s.rightCol}>
             <View style={s.grand}>
               <Text>Total ({cur})</Text>
-              <Text>{formatMoney(invoice.total, cur)}</Text>
+              <Text>{formatMoneyPdf(invoice.total, cur)}</Text>
             </View>
             <View style={s.sign}>
               <Text style={s.signLine}>Authorised Signatory</Text>
