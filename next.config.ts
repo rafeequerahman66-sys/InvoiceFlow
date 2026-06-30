@@ -4,6 +4,12 @@ const nextConfig: NextConfig = {
   // @react-pdf/renderer must run as a Node external (it ships its own reconciler).
   serverExternalPackages: ["@react-pdf/renderer"],
 
+  // The PDF route reads bundled .ttf fonts (for the ₹ glyph) from disk at runtime.
+  // Next won't trace files loaded via a dynamic fs path, so include them explicitly.
+  outputFileTracingIncludes: {
+    "/api/pdf": ["./src/lib/pdf/fonts/**"],
+  },
+
   headers: async () => [
     {
       // Service worker must not be cached by the browser — always fetch fresh

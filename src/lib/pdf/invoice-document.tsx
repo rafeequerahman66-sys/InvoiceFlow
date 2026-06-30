@@ -1,7 +1,21 @@
 /* eslint-disable jsx-a11y/alt-text */
-import { Document, Page, View, Text, StyleSheet } from "@react-pdf/renderer";
-import { formatMoneyPdf } from "@/lib/money";
+import path from "node:path";
+import { Document, Page, View, Text, StyleSheet, Font } from "@react-pdf/renderer";
+import { formatMoney } from "@/lib/money";
 import { amountInWords } from "@/lib/amount-in-words";
+
+// Helvetica (the PDF default) has no glyph for the Indian Rupee sign ₹ (U+20B9).
+// DejaVu Sans bundles it (and €/£/¥), so register it as the document font.
+const FONT_DIR = path.join(process.cwd(), "src/lib/pdf/fonts");
+Font.register({
+  family: "DejaVu Sans",
+  fonts: [
+    { src: path.join(FONT_DIR, "DejaVuSans.ttf") },
+    { src: path.join(FONT_DIR, "DejaVuSans-Bold.ttf"), fontWeight: "bold" },
+  ],
+});
+// Don't auto-hyphenate long words (it produced "PRI-VATE" style breaks).
+Font.registerHyphenationCallback((word) => [word]);
 
 export type PdfInvoice = {
   number: string;
@@ -56,42 +70,42 @@ const MUT = "#6b7280";
 const FAINT = "#9ca3af";
 
 const s = StyleSheet.create({
-  page: { paddingTop: 30, paddingBottom: 70, paddingHorizontal: 32, fontSize: 9, color: INK, fontFamily: "Helvetica", lineHeight: 1.4 },
+  page: { paddingTop: 30, paddingBottom: 70, paddingHorizontal: 32, fontSize: 9, color: INK, fontFamily: "DejaVu Sans", lineHeight: 1.4 },
 
   headRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  title: { fontSize: 24, fontFamily: "Helvetica-Bold", color: P, letterSpacing: 0.5 },
+  title: { fontSize: 24, fontWeight: "bold", color: P, letterSpacing: 0.5 },
   metaRow: { flexDirection: "row", marginTop: 4 },
   metaLabel: { color: MUT, width: 74, fontSize: 9 },
-  metaVal: { fontFamily: "Helvetica-Bold", fontSize: 9 },
+  metaVal: { fontWeight: "bold", fontSize: 9 },
   logoBox: { width: 60, height: 60, borderRadius: 8, backgroundColor: "#111111", alignItems: "center", justifyContent: "center" },
-  logoText: { color: "#ffffff", fontFamily: "Helvetica-Bold", fontSize: 15 },
+  logoText: { color: "#ffffff", fontWeight: "bold", fontSize: 15 },
 
   party: { flexDirection: "row", marginTop: 18, backgroundColor: PL, borderWidth: 1, borderColor: PLINE, borderRadius: 6 },
   partyCol: { flex: 1, padding: 12 },
   partyDivider: { borderRightWidth: 1, borderColor: PLINE },
-  partyLabel: { color: P, fontFamily: "Helvetica-Bold", fontSize: 10, marginBottom: 4 },
-  partyName: { fontFamily: "Helvetica-Bold", fontSize: 10, marginBottom: 2 },
+  partyLabel: { color: P, fontWeight: "bold", fontSize: 10, marginBottom: 4 },
+  partyName: { fontWeight: "bold", fontSize: 10, marginBottom: 2 },
   partyLine: { color: "#4b5563", fontSize: 8.5 },
-  bold: { fontFamily: "Helvetica-Bold" },
+  bold: { fontWeight: "bold" },
 
   supply: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 6, paddingVertical: 8, marginTop: 12 },
 
-  th: { flexDirection: "row", backgroundColor: P, color: "#fff", paddingVertical: 6, paddingHorizontal: 8, fontFamily: "Helvetica-Bold", fontSize: 8 },
+  th: { flexDirection: "row", backgroundColor: P, color: "#fff", paddingVertical: 6, paddingHorizontal: 8, fontWeight: "bold", fontSize: 8 },
   tr: { flexDirection: "row", backgroundColor: PL, paddingVertical: 8, paddingHorizontal: 8, borderBottomWidth: 1, borderColor: PLINE },
   cIdx: { width: 14 },
   cItem: { flex: 1, paddingRight: 6 },
-  cSac: { width: 48, textAlign: "center" },
+  cSac: { width: 44, textAlign: "center" },
   cGst: { width: 34, textAlign: "right" },
-  cQty: { width: 40, textAlign: "right" },
-  cRate: { width: 52, textAlign: "right" },
-  cAmt: { width: 58, textAlign: "right" },
-  cTax: { width: 48, textAlign: "right" },
-  cTot: { width: 58, textAlign: "right" },
-  itemName: { fontFamily: "Helvetica-Bold", fontSize: 9 },
+  cQty: { width: 42, textAlign: "right" },
+  cRate: { width: 58, textAlign: "right" },
+  cAmt: { width: 64, textAlign: "right" },
+  cTax: { width: 56, textAlign: "right" },
+  cTot: { width: 64, textAlign: "right" },
+  itemName: { fontWeight: "bold", fontSize: 9 },
   itemDesc: { color: MUT, fontSize: 8, marginTop: 1 },
 
   termsInItem: { marginTop: 8 },
-  termsHead: { fontFamily: "Helvetica-Bold", fontSize: 8.5, marginBottom: 2 },
+  termsHead: { fontWeight: "bold", fontSize: 8.5, marginBottom: 2 },
   bullet: { flexDirection: "row", marginBottom: 1 },
 
   wordsRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 12, alignItems: "flex-start" },
@@ -101,23 +115,23 @@ const s = StyleSheet.create({
 
   lower: { flexDirection: "row", justifyContent: "space-between", marginTop: 14, alignItems: "flex-start" },
   bankWrap: { flex: 1, paddingRight: 16 },
-  bankHead: { color: P, fontFamily: "Helvetica-Bold", fontSize: 10, marginBottom: 4 },
+  bankHead: { color: P, fontWeight: "bold", fontSize: 10, marginBottom: 4 },
   bankRow: { flexDirection: "row", paddingVertical: 1.5 },
   bankLabel: { width: 90, color: MUT, fontSize: 8.5 },
-  bankVal: { flex: 1, fontFamily: "Helvetica-Bold", fontSize: 8.5 },
+  bankVal: { flex: 1, fontWeight: "bold", fontSize: 8.5 },
 
   rightCol: { width: 210 },
-  grand: { flexDirection: "row", justifyContent: "space-between", backgroundColor: P, color: "#fff", paddingVertical: 8, paddingHorizontal: 10, borderRadius: 4, fontFamily: "Helvetica-Bold", fontSize: 12 },
+  grand: { flexDirection: "row", justifyContent: "space-between", backgroundColor: P, color: "#fff", paddingVertical: 8, paddingHorizontal: 10, borderRadius: 4, fontWeight: "bold", fontSize: 12 },
   sign: { alignItems: "center", marginTop: 26 },
   signLine: { width: 150, borderTopWidth: 1, borderColor: MUT, marginTop: 26, paddingTop: 3, textAlign: "center", color: MUT, fontSize: 8.5 },
 
   tnc: { marginTop: 24, borderTopWidth: 1, borderColor: PLINE, paddingTop: 10 },
-  tncHead: { color: P, fontFamily: "Helvetica-Bold", fontSize: 10, marginBottom: 4 },
+  tncHead: { color: P, fontWeight: "bold", fontSize: 10, marginBottom: 4 },
 
   footer: { position: "absolute", bottom: 26, left: 32, right: 32, borderTopWidth: 1, borderColor: PLINE, borderStyle: "dashed", paddingTop: 6, flexDirection: "row", justifyContent: "space-between" },
   footCell: { flexDirection: "column" },
   footLabel: { color: FAINT, fontSize: 7 },
-  footVal: { fontSize: 8, fontFamily: "Helvetica-Bold" },
+  footVal: { fontSize: 8, fontWeight: "bold" },
 });
 
 const COUNTRY: Record<string, string> = { IN: "India", US: "United States", GB: "United Kingdom", AE: "United Arab Emirates", DE: "Germany" };
@@ -130,7 +144,7 @@ function logoMark(name: string): string {
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <Text style={{ color: "#4b5563", fontSize: 8.5 }}>
-      <Text style={{ fontFamily: "Helvetica-Bold", color: INK }}>{label} </Text>
+      <Text style={{ fontWeight: "bold", color: INK }}>{label} </Text>
       {value}
     </Text>
   );
@@ -239,10 +253,10 @@ export function InvoiceDocument({ invoice, business }: { invoice: PdfInvoice; bu
               <Text style={s.cSac}>{it.sacCode || "—"}</Text>
               <Text style={s.cGst}>{it.taxRate}%</Text>
               <Text style={s.cQty}>{it.qty}</Text>
-              <Text style={s.cRate}>{formatMoneyPdf(it.rate, cur)}</Text>
-              <Text style={s.cAmt}>{formatMoneyPdf(amount, cur)}</Text>
-              <Text style={s.cTax}>{formatMoneyPdf(it.lineTax, cur)}</Text>
-              <Text style={s.cTot}>{formatMoneyPdf(it.lineTotal, cur)}</Text>
+              <Text style={s.cRate}>{formatMoney(it.rate, cur)}</Text>
+              <Text style={s.cAmt}>{formatMoney(amount, cur)}</Text>
+              <Text style={s.cTax}>{formatMoney(it.lineTax, cur)}</Text>
+              <Text style={s.cTot}>{formatMoney(it.lineTotal, cur)}</Text>
             </View>
           );
         })}
@@ -256,23 +270,23 @@ export function InvoiceDocument({ invoice, business }: { invoice: PdfInvoice; bu
           <View style={s.amtBox}>
             <View style={s.amtRow}>
               <Text style={{ color: MUT }}>Amount</Text>
-              <Text>{formatMoneyPdf(invoice.taxableValue, cur)}</Text>
+              <Text>{formatMoney(invoice.taxableValue, cur)}</Text>
             </View>
             {intra ? (
               <>
                 <View style={s.amtRow}>
                   <Text style={{ color: MUT }}>CGST</Text>
-                  <Text>{formatMoneyPdf(invoice.cgst, cur)}</Text>
+                  <Text>{formatMoney(invoice.cgst, cur)}</Text>
                 </View>
                 <View style={s.amtRow}>
                   <Text style={{ color: MUT }}>SGST</Text>
-                  <Text>{formatMoneyPdf(invoice.sgst, cur)}</Text>
+                  <Text>{formatMoney(invoice.sgst, cur)}</Text>
                 </View>
               </>
             ) : (
               <View style={s.amtRow}>
                 <Text style={{ color: MUT }}>IGST</Text>
-                <Text>{formatMoneyPdf(invoice.igst, cur)}</Text>
+                <Text>{formatMoney(invoice.igst, cur)}</Text>
               </View>
             )}
           </View>
@@ -327,7 +341,7 @@ export function InvoiceDocument({ invoice, business }: { invoice: PdfInvoice; bu
           <View style={s.rightCol}>
             <View style={s.grand}>
               <Text>Total ({cur})</Text>
-              <Text>{formatMoneyPdf(invoice.total, cur)}</Text>
+              <Text>{formatMoney(invoice.total, cur)}</Text>
             </View>
             <View style={s.sign}>
               <Text style={s.signLine}>Authorised Signatory</Text>
